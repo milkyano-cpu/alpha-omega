@@ -91,21 +91,17 @@ export function VerificationForm({
     setError(null);
 
     try {
-      console.log('Verifying OTP:', { phoneNumber, otpCode });
       const response = await verify(phoneNumber, otpCode);
-      console.log('Verification response:', response);
 
       // On successful verification, redirect to home or dashboard
       if (response && response.data === true) {
-        console.log('Verification successful, redirecting to homepage');
-        
         // Add a small delay to allow the auth context to update
         // from the user data fetched in the verification process
         setTimeout(() => {
           router.push("/");
-        }, 500);
+        }, 100);
       } else {
-        throw new Error('Verification failed');
+        throw new Error("Verification failed");
       }
     } catch (err) {
       console.error("Verification error:", err);

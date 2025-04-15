@@ -80,11 +80,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         otp_code: otpCode,
       });
 
-      // After successful verification, update the user state if not already set
-      if (response.data === true && !user) {
-        const storedUser = AuthService.getUser();
-        if (storedUser) {
-          setUser(storedUser);
+      if (response && response.data === true) {
+        const user = AuthService.getUser();
+        if (user) {
+          user.verified = true;
+          localStorage.setItem("user", JSON.stringify(user));
         }
       }
 

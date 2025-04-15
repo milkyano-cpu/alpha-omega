@@ -34,12 +34,16 @@ const signUpSchema = z.object({
   password: z
     .string()
     .min(8, { message: "Password must be at least 8 characters" })
-    .regex(/[A-Z]/, { message: "Password must contain at least one uppercase letter" })
+    .regex(/[A-Z]/, {
+      message: "Password must contain at least one uppercase letter",
+    })
     .regex(/[0-9]/, { message: "Password must contain at least one number" }),
   phone_number: z
     .string()
     .min(8, { message: "Phone number is required" })
-    .regex(/^\+?[0-9]+$/, { message: "Phone number must contain only numbers and may start with +" }),
+    .regex(/^\+?[0-9]+$/, {
+      message: "Phone number must contain only numbers and may start with +",
+    }),
   birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
     message: "Birthday must be in the format YYYY-MM-DD",
   }),
@@ -77,16 +81,23 @@ export function SignUpForm({
     try {
       // Update the phone number format if needed (ensure it has a + prefix)
       const formattedValues = { ...values };
-      if (formattedValues.phone_number && !formattedValues.phone_number.startsWith('+')) {
+      if (
+        formattedValues.phone_number &&
+        !formattedValues.phone_number.startsWith("+")
+      ) {
         formattedValues.phone_number = `+${formattedValues.phone_number}`;
       }
-      
+
       // Register the user
-      const response = await register(formattedValues);
-      console.log('Registration successful:', response);
-      
+      await register(formattedValues);
+
       // Always redirect to verify page - user will be redirected to home after verification
-      router.push(`/verify?phone=${encodeURIComponent(formattedValues.phone_number)}`);
+      setTimeout(() => {
+        // Use router.push with the replace option to force a navigation
+        router.push(
+          `/verify?phone=${encodeURIComponent(formattedValues.phone_number)}`
+        );
+      }, 100);
     } catch (err) {
       console.error("Registration error:", err);
       setError(err instanceof Error ? err.message : "Failed to create account");
@@ -100,9 +111,7 @@ export function SignUpForm({
       <Card>
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Create your account</CardTitle>
-          <CardDescription>
-            Enter your information to sign up
-          </CardDescription>
+          <CardDescription>Enter your information to sign up</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -112,7 +121,7 @@ export function SignUpForm({
                   {error}
                 </div>
               )}
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -164,10 +173,10 @@ export function SignUpForm({
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="email" 
-                        placeholder="your.email@example.com" 
-                        {...field} 
+                      <Input
+                        type="email"
+                        placeholder="your.email@example.com"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -182,10 +191,10 @@ export function SignUpForm({
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="password" 
-                        placeholder="••••••••" 
-                        {...field} 
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -200,10 +209,7 @@ export function SignUpForm({
                   <FormItem>
                     <FormLabel>Phone Number</FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="+1234567890" 
-                        {...field} 
-                      />
+                      <Input placeholder="+1234567890" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -217,7 +223,7 @@ export function SignUpForm({
                   <FormItem>
                     <FormLabel>Birthday</FormLabel>
                     <FormControl>
-                      <Input 
+                      <Input
                         type="date"
                         {...field}
                         onChange={(e) => {
@@ -230,11 +236,7 @@ export function SignUpForm({
                 )}
               />
 
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Creating account..." : "Sign Up"}
               </Button>
 
