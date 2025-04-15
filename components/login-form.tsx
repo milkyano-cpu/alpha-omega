@@ -56,7 +56,9 @@ export function LoginForm({
     setError(null);
 
     try {
-      await login(values.email, values.password);
+      console.log("Attempting login with:", values.email);
+      const response = await login(values.email, values.password);
+      console.log("Login successful:", response);
 
       // Redirect to homepage after successful login
       router.push("/");

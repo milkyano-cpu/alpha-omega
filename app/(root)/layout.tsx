@@ -1,5 +1,6 @@
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
+import { VerificationRequired } from "@/components/verification-required";
 
 export default function RootLayout({
   children,
@@ -9,7 +10,9 @@ export default function RootLayout({
   return (
     <>
       <Navbar />
-      {children}
+      <VerificationRequired>
+        {children}
+      </VerificationRequired>
       <Footer />
     </>
   );

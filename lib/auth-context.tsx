@@ -1,7 +1,18 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, AuthService, AuthResponse, VerifyResponse } from "@/lib/auth-service";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
+import {
+  User,
+  AuthService,
+  AuthResponse,
+  VerifyResponse,
+} from "@/lib/auth-service";
 
 interface AuthContextType {
   user: User | null;
@@ -48,7 +59,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsLoading(true);
     try {
       const response = await AuthService.register(userData);
-      // Don't set user here as they need to verify first
+      // Update user state - but we'll check verification status
+      // in components to determine if they need to verify first
+      if (response.data && response.data.user) {
+        setUser(response.data.user);
+      }
       setIsLoading(false);
       return response;
     } catch (error) {
@@ -60,10 +75,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const verify = async (phoneNumber: string, otpCode: string) => {
     setIsLoading(true);
     try {
-      const response = await AuthService.verify({ phone_number: phoneNumber, otp_code: otpCode });
-      // After verification, the user should be logged in
-      // We might need to get the user from localStorage now
-      setUser(AuthService.getUser());
+      const response = await AuthService.verify({
+        phone_number: phoneNumber,
+        otp_code: otpCode,
+      });
+
+      // After successful verification, update the user state if not already set
+      if (response.data === true && !user) {
+        const storedUser = AuthService.getUser();
+        if (storedUser) {
+          setUser(storedUser);
+        }
+      }
+
       setIsLoading(false);
       return response;
     } catch (error) {

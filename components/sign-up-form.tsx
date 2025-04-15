@@ -75,10 +75,18 @@ export function SignUpForm({
     setError(null);
 
     try {
-      await register(values);
+      // Update the phone number format if needed (ensure it has a + prefix)
+      const formattedValues = { ...values };
+      if (formattedValues.phone_number && !formattedValues.phone_number.startsWith('+')) {
+        formattedValues.phone_number = `+${formattedValues.phone_number}`;
+      }
       
-      // Navigate to verify page
-      router.push(`/verify?phone=${encodeURIComponent(values.phone_number)}`);
+      // Register the user
+      const response = await register(formattedValues);
+      console.log('Registration successful:', response);
+      
+      // Always redirect to verify page - user will be redirected to home after verification
+      router.push(`/verify?phone=${encodeURIComponent(formattedValues.phone_number)}`);
     } catch (err) {
       console.error("Registration error:", err);
       setError(err instanceof Error ? err.message : "Failed to create account");
