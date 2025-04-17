@@ -27,19 +27,10 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    return AuthService.getUser();
+  });
   const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Check if user is already logged in on initial load
-    const initAuth = () => {
-      const user = AuthService.getUser();
-      setUser(user);
-      setIsLoading(false);
-    };
-
-    initAuth();
-  }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);

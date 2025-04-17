@@ -1,9 +1,24 @@
+"use client";
+
 import { FAQSection } from "@/components/faq";
 import { MainForm } from "@/components/main-form";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 import Image from "next/image";
 
 export default function Home() {
+  const router = useRouter();
+  const { isAuthenticated } = useAuth();
+
+  const handleBookNow = () => {
+    if (isAuthenticated) {
+      router.push('/book/services');
+    } else {
+      router.push('/login?returnUrl=/book/services');
+    }
+  };
+
   return (
     <main className="flex flex-col gap-20">
       <section className="bg-[url('/bg/main-1.png')] bg-cover bg-center h-screen flex flex-col justify-center items-center text-center text-white">
@@ -27,7 +42,7 @@ export default function Home() {
           EXPERIENCE THE ART OF ELEGANCE 
         </p>
 
-        <Button variant={"negative"} className="mt-8">
+        <Button variant={"negative"} className="mt-8" onClick={handleBookNow}>
           BOOK NOW
         </Button>
       </section>
@@ -94,7 +109,9 @@ export default function Home() {
           </div>
         </div>
 
-        <Button className="rounded-full px-10">CHECK OUR SERVICES</Button>
+        <Button className="rounded-full px-10" onClick={handleBookNow}>
+          CHECK OUR SERVICES
+        </Button>
         <p className="text-center">
           Enjoy our introductory 10$ discount on our services by pre-booking
           your next appointment in our shop.
@@ -443,7 +460,7 @@ export default function Home() {
           disappoint!
         </p>
 
-        <Button variant={"secondary"} className="rounded-full">
+        <Button variant={"secondary"} className="rounded-full" onClick={handleBookNow}>
           Book appointment
         </Button>
 
