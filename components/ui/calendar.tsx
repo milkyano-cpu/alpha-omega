@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import dayjs from "dayjs";
 
@@ -41,8 +41,30 @@ export function BookingCalendar({
   const daysInMonth = currentMonth.daysInMonth();
   const firstDayOfMonth = currentMonth.startOf("month").day();
 
-  const prevMonth = () => setCurrentMonth(currentMonth.subtract(1, "month"));
-  const nextMonth = () => setCurrentMonth(currentMonth.add(1, "month"));
+  const prevMonth = () => {
+    const newMonth = currentMonth.subtract(1, "month");
+    setCurrentMonth(newMonth);
+  };
+
+  // Track if this is the first render
+  const isInitialRender = React.useRef(true);
+
+  const nextMonth = () => {
+    const newMonth = currentMonth.add(1, "month");
+    setCurrentMonth(newMonth);
+    
+    // Don't dispatch event on first render
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      return;
+    }
+    
+    // Add an event to signal the parent component to fetch next month data
+    const event = new CustomEvent('fetchNextMonth', { 
+      detail: { year: newMonth.year(), month: newMonth.month() }
+    });
+    window.dispatchEvent(event);
+  };
 
   const handleDateSelection = (day: number) => {
     // Create a new date object for the selected day in the current month
@@ -136,7 +158,7 @@ export function BookingCalendar({
                   ? isDisabled
                     ? "text-gray-300 cursor-not-allowed"
                     : !isAvailableDate(dayNumber)
-                      ? "text-gray-300 line-through cursor-not-allowed border-gray-200 bg-gray-50"
+                      ? "text-gray-400 cursor-not-allowed border-gray-100 bg-gray-50 relative after:content-[''] after:absolute after:w-full after:h-[1px] after:bg-gray-300 after:left-0 after:top-1/2 after:-rotate-12"
                       : "hover:bg-gray-200 cursor-pointer border border-transparent hover:border-gray-300"
                   : ""
               } ${isSelected ? "bg-black text-white border-transparent" : ""}
