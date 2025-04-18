@@ -9,15 +9,18 @@ interface BookingCalendarProps {
   onChange?: (date: Date) => void;
 }
 
-export function BookingCalendar({ selectedDate: propSelectedDate, onChange }: BookingCalendarProps) {
+export function BookingCalendar({
+  selectedDate: propSelectedDate,
+  onChange,
+}: BookingCalendarProps) {
   // Use dayjs for consistent date handling
   const [currentMonth, setCurrentMonth] = useState(dayjs().startOf("month"));
-  
+
   // Convert propSelectedDate to dayjs date for internal use
-  const [selectedDate, setSelectedDate] = useState(
+  const [, setSelectedDate] = useState(
     propSelectedDate ? dayjs(propSelectedDate).date() : dayjs().date()
   );
-  
+
   // Also store the full selected dayjs object for accurate comparisons
   const [selectedDayjs, setSelectedDayjs] = useState(
     propSelectedDate ? dayjs(propSelectedDate) : dayjs()
@@ -44,7 +47,7 @@ export function BookingCalendar({ selectedDate: propSelectedDate, onChange }: Bo
     const newDateDayjs = currentMonth.date(day);
     setSelectedDate(day);
     setSelectedDayjs(newDateDayjs);
-    
+
     // Call the onChange handler if provided
     if (onChange) {
       onChange(newDateDayjs.toDate());
@@ -54,14 +57,16 @@ export function BookingCalendar({ selectedDate: propSelectedDate, onChange }: Bo
   // Disable past dates (can't book appointments in the past)
   const isPastDate = (day: number) => {
     const date = currentMonth.date(day);
-    return date.isBefore(dayjs().startOf('day'));
+    return date.isBefore(dayjs().startOf("day"));
   };
 
   // Check if a day is the selected date (considering month and year)
   const isSelectedDay = (day: number) => {
-    return selectedDayjs.date() === day && 
-           selectedDayjs.month() === currentMonth.month() && 
-           selectedDayjs.year() === currentMonth.year();
+    return (
+      selectedDayjs.date() === day &&
+      selectedDayjs.month() === currentMonth.month() &&
+      selectedDayjs.year() === currentMonth.year()
+    );
   };
 
   return (
@@ -71,15 +76,15 @@ export function BookingCalendar({ selectedDate: propSelectedDate, onChange }: Bo
           {currentMonth.format("MMMM YYYY")}
         </h2>
         <div className="flex gap-2">
-          <button 
-            onClick={prevMonth} 
+          <button
+            onClick={prevMonth}
             className="p-2 border rounded hover:bg-gray-100 transition-colors"
             aria-label="Previous month"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
-          <button 
-            onClick={nextMonth} 
+          <button
+            onClick={nextMonth}
             className="p-2 border rounded hover:bg-gray-100 transition-colors"
             aria-label="Next month"
           >
@@ -102,16 +107,22 @@ export function BookingCalendar({ selectedDate: propSelectedDate, onChange }: Bo
           const dayNumber = day !== null ? day + 1 : null;
           const isDisabled = dayNumber !== null && isPastDate(dayNumber);
           const isSelected = dayNumber !== null && isSelectedDay(dayNumber);
-          
+
           return (
             <div
               key={index}
               className={`p-4 text-center rounded-md ${
-                dayNumber !== null ? 
-                  isDisabled ? "text-gray-300 cursor-not-allowed" : "hover:bg-gray-200 cursor-pointer" 
-                : ""
+                dayNumber !== null
+                  ? isDisabled
+                    ? "text-gray-300 cursor-not-allowed"
+                    : "hover:bg-gray-200 cursor-pointer"
+                  : ""
               } ${isSelected ? "bg-black text-white" : ""}`}
-              onClick={() => dayNumber !== null && !isDisabled && handleDateSelection(dayNumber)}
+              onClick={() =>
+                dayNumber !== null &&
+                !isDisabled &&
+                handleDateSelection(dayNumber)
+              }
             >
               {dayNumber !== null ? dayNumber : ""}
             </div>
