@@ -7,11 +7,13 @@ import dayjs from "dayjs";
 interface BookingCalendarProps {
   selectedDate?: Date;
   onChange?: (date: Date) => void;
+  availableDates?: Set<string>;
 }
 
 export function BookingCalendar({
   selectedDate: propSelectedDate,
   onChange,
+  availableDates = new Set(),
 }: BookingCalendarProps) {
   // Use dayjs for consistent date handling
   const [currentMonth, setCurrentMonth] = useState(dayjs().startOf("month"));
@@ -60,12 +62,30 @@ export function BookingCalendar({
     return date.isBefore(dayjs().startOf("day"));
   };
 
+  // Check if a specific day has available time slots
+  const isAvailableDate = (day: number) => {
+    const date = currentMonth.date(day);
+    // Format date to match our API date string (YYYY-MM-DD)
+    const dateString = date.format('YYYY-MM-DD');
+    return availableDates.has(dateString);
+  };
+
   // Check if a day is the selected date (considering month and year)
   const isSelectedDay = (day: number) => {
     return (
       selectedDayjs.date() === day &&
       selectedDayjs.month() === currentMonth.month() &&
       selectedDayjs.year() === currentMonth.year()
+    );
+  };
+  
+  // Check if a day is today
+  const isToday = (day: number) => {
+    const today = dayjs();
+    return (
+      today.date() === day &&
+      today.month() === currentMonth.month() &&
+      today.year() === currentMonth.year()
     );
   };
 
@@ -115,12 +135,25 @@ export function BookingCalendar({
                 dayNumber !== null
                   ? isDisabled
                     ? "text-gray-300 cursor-not-allowed"
-                    : "hover:bg-gray-200 cursor-pointer"
+                    : !isAvailableDate(dayNumber)
+                      ? "text-gray-300 line-through cursor-not-allowed border-gray-200 bg-gray-50"
+                      : "hover:bg-gray-200 cursor-pointer border border-transparent hover:border-gray-300"
                   : ""
-              } ${isSelected ? "bg-black text-white" : ""}`}
+              } ${isSelected ? "bg-black text-white border-transparent" : ""}
+              ${isToday(dayNumber) && !isSelected ? "border border-black font-bold" : ""}`}
+              title={
+                dayNumber !== null
+                  ? isDisabled
+                    ? "Past dates are not available for booking"
+                    : !isAvailableDate(dayNumber)
+                      ? "No available appointments on this date"
+                      : "Click to see available appointment times"
+                  : ""
+              }
               onClick={() =>
                 dayNumber !== null &&
                 !isDisabled &&
+                isAvailableDate(dayNumber) &&
                 handleDateSelection(dayNumber)
               }
             >

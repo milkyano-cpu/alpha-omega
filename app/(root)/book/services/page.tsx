@@ -113,13 +113,20 @@ export default function ServiceSelection() {
     fetchData();
   }, [isAuthenticated, router]);
 
-  const handleBookService = (barberId: number, service: Service) => {
-    // Store selected service and barber info in localStorage for the appointment page
-    localStorage.setItem("selectedService", JSON.stringify(service));
-    localStorage.setItem("selectedBarberId", barberId.toString());
+  const handleBookService = async (barberId: number, service: Service) => {
+    try {
+      // Store selected service and barber info in localStorage for the appointment page
+      localStorage.setItem("selectedService", JSON.stringify(service));
+      localStorage.setItem("selectedBarberId", barberId.toString());
 
-    // Navigate to appointment page
-    router.push("/book/appointment");
+      // Navigate to appointment page
+      router.push("/book/appointment");
+    } catch (err) {
+      console.error("Error booking service:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to book service"
+      );
+    }
   };
 
   if (isLoading) {
