@@ -47,10 +47,10 @@ export default function AppointmentBooking() {
       return;
     }
 
-    const serviceData = localStorage.getItem('selectedService');
+    const serviceData = localStorage.getItem("selectedService");
     if (!serviceData) {
       // No service selected, redirect back to services page
-      router.push('/book/services');
+      router.push("/book/services");
       return;
     }
 
@@ -58,8 +58,8 @@ export default function AppointmentBooking() {
       const parsedService = JSON.parse(serviceData) as Service;
       setSelectedService(parsedService);
     } catch (err) {
-      console.error('Error parsing selected service:', err);
-      router.push('/book/services');
+      console.error("Error parsing selected service:", err);
+      router.push("/book/services");
     }
   }, [isAuthenticated, router]);
 
@@ -70,42 +70,49 @@ export default function AppointmentBooking() {
     const fetchAvailability = async () => {
       setIsLoading(true);
       setError(null);
-      
+
       try {
         // Format date for API request
         const startDate = new Date(selectedDate);
         startDate.setHours(0, 0, 0, 0);
-        
+
         const endDate = new Date(selectedDate);
         endDate.setHours(23, 59, 59, 999);
-        
+
         // Call API to get availability for selected service and date
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"}/services/availability/search`,
+          `${
+            process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
+          }/services/availability/search`,
           {
-            method: 'POST',
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
             },
             body: JSON.stringify({
               service_variation_id: selectedService.service_variation_id,
               start_at: startDate.toISOString(),
-              end_at: endDate.toISOString()
-            })
+              end_at: endDate.toISOString(),
+            }),
           }
         );
-        
+
         if (!response.ok) {
-          throw new Error('Failed to fetch availability');
+          throw new Error("Failed to fetch availability");
         }
-        
+
         const data = await response.json();
-        const availabilities = data.data?.availabilities_by_date?.[startDate.toISOString().split('T')[0]] || [];
+        const availabilities =
+          data.data?.availabilities_by_date?.[
+            startDate.toISOString().split("T")[0]
+          ] || [];
         setAvailableTimes(availabilities);
       } catch (err) {
-        console.error('Error fetching availability:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load available times');
+        console.error("Error fetching availability:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to load available times"
+        );
       } finally {
         setIsLoading(false);
       }
@@ -125,7 +132,7 @@ export default function AppointmentBooking() {
 
   const handleBookingConfirmation = async () => {
     if (!selectedService || !selectedTime || !user) {
-      setError('Please select a service, date, and time');
+      setError("Please select a service, date, and time");
       return;
     }
 
@@ -133,37 +140,48 @@ export default function AppointmentBooking() {
     setError(null);
 
     try {
+      // Get service variation version from the appointment segments
+      const serviceVariationVersion =
+        selectedTime.appointment_segments?.[0]?.service_variation_version;
+      console.log(
+        "Booking with service variation version:",
+        serviceVariationVersion
+      );
+
       // Create booking in API
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"}/bookings`,
+        `${
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
+        }/bookings`,
         {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           body: JSON.stringify({
             service_variation_id: selectedService.service_variation_id,
             team_member_id: selectedService.team_member_id.toString(),
-            start_at: selectedTime.start_at
-          })
+            start_at: selectedTime.start_at,
+            service_variation_version: serviceVariationVersion,
+          }),
         }
       );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create booking');
+        throw new Error(errorData.message || "Failed to create booking");
       }
 
       // Booking successful, clear localStorage
-      localStorage.removeItem('selectedService');
-      localStorage.removeItem('selectedBarberId');
+      localStorage.removeItem("selectedService");
+      localStorage.removeItem("selectedBarberId");
 
       // Redirect to confirmation page or home
-      router.push('/book/thank-you');
+      router.push("/book/thank-you");
     } catch (err) {
-      console.error('Error creating booking:', err);
-      setError(err instanceof Error ? err.message : 'Failed to create booking');
+      console.error("Error creating booking:", err);
+      setError(err instanceof Error ? err.message : "Failed to create booking");
     } finally {
       setCreating(false);
     }
@@ -172,7 +190,11 @@ export default function AppointmentBooking() {
   // Format time for display
   const formatTime = (isoTime: string) => {
     const time = new Date(isoTime);
-    return time.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    return time.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
   };
 
   if (!selectedService) {
@@ -190,9 +212,9 @@ export default function AppointmentBooking() {
     <main className="flex flex-col gap-20 mt-20">
       <section className="flex flex-col md:flex-row gap-8 py-20 justify-center px-4">
         <div className="w-full md:w-auto">
-          <BookingCalendar 
-            selectedDate={selectedDate} 
-            onChange={handleDateChange} 
+          <BookingCalendar
+            selectedDate={selectedDate}
+            onChange={handleDateChange}
           />
         </div>
 
@@ -203,7 +225,10 @@ export default function AppointmentBooking() {
             <div className="flex flex-col gap-4 p-4 border-b border-black">
               <p>{selectedService.name}</p>
               <div className="flex gap-8">
-                <sub>${(selectedService.price_amount / 100).toFixed(2)} {selectedService.price_currency}</sub>
+                <sub>
+                  ${(selectedService.price_amount / 100).toFixed(2)}{" "}
+                  {selectedService.price_currency}
+                </sub>
                 <sub>{selectedService.duration} Mins</sub>
               </div>
             </div>
@@ -218,7 +243,13 @@ export default function AppointmentBooking() {
             <div className="mt-4 p-4 border border-green-500 rounded-xl bg-green-50">
               <p className="font-bold">Selected Time:</p>
               <p>{formatTime(selectedTime.start_at)}</p>
-              <p>{new Date(selectedTime.start_at).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+              <p>
+                {new Date(selectedTime.start_at).toLocaleDateString("en-US", {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </p>
             </div>
           )}
 
@@ -228,19 +259,19 @@ export default function AppointmentBooking() {
             </div>
           )}
 
-          <Button 
-            onClick={handleBookingConfirmation} 
-            disabled={!selectedTime || creating} 
+          <Button
+            onClick={handleBookingConfirmation}
+            disabled={!selectedTime || creating}
             className="mt-6"
           >
-            {creating ? 'Creating Booking...' : 'Confirm Booking'}
+            {creating ? "Creating Booking..." : "Confirm Booking"}
           </Button>
         </div>
       </section>
 
       <section className="flex flex-col gap-8 container mx-auto mb-40 px-4">
         <h2 className="text-xl font-bold">Available Times</h2>
-        
+
         {isLoading ? (
           <div className="text-center py-10">
             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
@@ -249,9 +280,11 @@ export default function AppointmentBooking() {
         ) : availableTimes.length > 0 ? (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {availableTimes.map((time, index) => (
-              <Button 
-                key={index} 
-                className={`rounded-md px-4 py-2 text-base ${selectedTime?.start_at === time.start_at ? 'bg-green-600' : ''}`} 
+              <Button
+                key={index}
+                className={`rounded-md px-4 py-2 text-base ${
+                  selectedTime?.start_at === time.start_at ? "bg-green-600" : ""
+                }`}
                 onClick={() => handleTimeSelection(time)}
               >
                 {formatTime(time.start_at)}
@@ -259,7 +292,9 @@ export default function AppointmentBooking() {
             ))}
           </div>
         ) : (
-          <p className="text-center py-10">No available times for the selected date. Please try another date.</p>
+          <p className="text-center py-10">
+            No available times for the selected date. Please try another date.
+          </p>
         )}
       </section>
     </main>
