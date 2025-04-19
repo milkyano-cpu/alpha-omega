@@ -21,7 +21,7 @@ export default function ThankYou() {
   }, [isAuthenticated, router]);
 
   return (
-    <main className="flex flex-col gap-20 mt-40">
+    <main className="flex flex-col gap-20 mt-30">
       <section className="container mx-auto flex flex-col items-center justify-center text-center py-20 px-4">
         <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-8">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import PhoneInput from "react-phone-number-input";
+import { isPossiblePhoneNumber } from "react-phone-number-input";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -42,9 +44,21 @@ const signUpSchema = z.object({
   phone_number: z
     .string()
     .min(8, { message: "Phone number is required" })
-    .regex(/^\+?[0-9]+$/, {
-      message: "Phone number must contain only numbers and may start with +",
-    }),
+    .refine((value) => value.startsWith("+"), {
+      message: "Phone number must start with a country code (e.g., +61)",
+    })
+    .refine(
+      (value) => {
+        try {
+          return isPossiblePhoneNumber(value);
+        } catch (error) {
+          return false;
+        }
+      },
+      {
+        message: "Please enter a valid phone number",
+      }
+    ),
   birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
     message: "Birthday must be in the format YYYY-MM-DD",
   }),
@@ -59,6 +73,7 @@ export function SignUpForm({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState("+61"); // Default to Australia
   const router = useRouter();
 
   const form = useForm<SignUpFormValues>({
@@ -69,7 +84,7 @@ export function SignUpForm({
       nickname: "",
       email: "",
       password: "",
-      phone_number: "",
+      phone_number: "+61", // Default to Australia
       birthday: "",
     },
   });
@@ -81,14 +96,8 @@ export function SignUpForm({
     setError(null);
 
     try {
-      // Update the phone number format if needed (ensure it has a + prefix)
+      // Use the phone number directly - it should already be in the correct format
       const formattedValues = { ...values };
-      if (
-        formattedValues.phone_number &&
-        !formattedValues.phone_number.startsWith("+")
-      ) {
-        formattedValues.phone_number = `+${formattedValues.phone_number}`;
-      }
 
       // Register the user
       await register(formattedValues);
@@ -223,7 +232,19 @@ export function SignUpForm({
                   <FormItem>
                     <FormLabel>Phone Number</FormLabel>
                     <FormControl>
-                      <Input placeholder="+1234567890" {...field} />
+                      <div className="phone-input-container">
+                        <PhoneInput
+                          defaultCountry="AU"
+                          international
+                          value={field.value}
+                          onChange={(value) => {
+                            field.onChange(value || "+61");
+                            setPhoneNumber(value || "+61");
+                          }}
+                          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                          placeholder="+61 412 123 456"
+                        />
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
