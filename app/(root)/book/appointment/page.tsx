@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { BookingCalendar } from "@/components/ui/calendar";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { BookingService, TimeSlot } from "@/lib/booking-service";
 
 interface Service {
   id: number;
@@ -18,109 +19,38 @@ interface Service {
   square_catalog_id: string;
 }
 
-interface Availability {
-  start_at: string;
-  location_id: string;
-  appointment_segments: {
-    duration_minutes: number;
-    service_variation_id: string;
-    team_member_id: string;
-    service_variation_version: number;
-  }[];
-}
+// Using TimeSlot interface from booking-service.ts
 
 export default function AppointmentBooking() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [availableTimes, setAvailableTimes] = useState<Availability[]>([]);
+  const [availableTimes, setAvailableTimes] = useState<TimeSlot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [creating, setCreating] = useState(false);
-  const [selectedTime, setSelectedTime] = useState<Availability | null>(null);
+  const [selectedTime, setSelectedTime] = useState<TimeSlot | null>(null);
   const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
 
-  // Square payment checkout script
-  useEffect(() => {
-    // Only add the script if it doesn't already exist
-    if (typeof window !== "undefined") {
-      const handleCheckoutClick = (e: MouseEvent) => {
-        e.preventDefault();
-
-        const button = e.currentTarget as HTMLAnchorElement;
-        const url = button.getAttribute("data-url");
-        const title = "Square Payment Links";
-
-        // Some platforms embed in an iframe, so we want to top window to calculate sizes correctly
-        const topWindow = window.top ? window.top : window;
-
-        // Fixes dual-screen position                             Most browsers      Firefox
-        const dualScreenLeft =
-          topWindow.screenLeft !== undefined
-            ? topWindow.screenLeft
-            : window.screenX;
-        const dualScreenTop =
-          topWindow.screenTop !== undefined
-            ? topWindow.screenTop
-            : window.screenY;
-
-        const width = topWindow.innerWidth
-          ? topWindow.innerWidth
-          : document.documentElement.clientWidth
-          ? document.documentElement.clientWidth
-          : screen.width;
-        const height = topWindow.innerHeight
-          ? topWindow.innerHeight
-          : document.documentElement.clientHeight
-          ? document.documentElement.clientHeight
-          : screen.height;
-
-        const h = height * 0.75;
-        const w = 500;
-
-        const systemZoom = width / window.screen.availWidth;
-        const left = (width - w) / 2 / systemZoom + dualScreenLeft;
-        const top = (height - h) / 2 / systemZoom + dualScreenTop;
-
-        if (url) {
-          const newWindow = window.open(
-            url,
-            title,
-            `scrollbars=yes, width=${w / systemZoom}, height=${
-              h / systemZoom
-            }, top=${top}, left=${left}`
-          );
-          if (newWindow && window.focus) newWindow.focus();
-        }
-      };
-
-      // Add click event listener after component mounts
-      setTimeout(() => {
-        const checkoutButton = document.getElementById(
-          "embedded-checkout-modal-checkout-button"
-        );
-        if (checkoutButton) {
-          checkoutButton.addEventListener("click", handleCheckoutClick as any);
-        }
-      }, 1000);
-
-      // Clean up event listener when component unmounts
-      return () => {
-        const checkoutButton = document.getElementById(
-          "embedded-checkout-modal-checkout-button"
-        );
-        if (checkoutButton) {
-          checkoutButton.removeEventListener(
-            "click",
-            handleCheckoutClick as any
-          );
-        }
-      };
-    }
-  }, [selectedTime, paymentCompleted]); // Re-run when selectedTime or payment completion changes
+  // Handle payment process
+  const handlePayment = (e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    // Open payment link in a popup
+    window.open(
+      "https://square.link/u/K0DxFxCJ?src=embed",
+      "Square Payment",
+      "width=500,height=600,scrollbars=yes"
+    );
+    
+    // Simulate successful payment after a short delay
+    setTimeout(() => {
+      setPaymentCompleted(true);
+    }, 1000);
+  };
 
   // Load selected service from localStorage
   useEffect(() => {
@@ -161,34 +91,16 @@ export default function AppointmentBooking() {
         const endDate = new Date(selectedDate);
         endDate.setHours(23, 59, 59, 999);
 
-        // Call API to get availability for selected service and date
-        const response = await fetch(
-          `${
-            process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
-          }/services/availability/search`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-            body: JSON.stringify({
-              service_variation_id: selectedService.service_variation_id,
-              start_at: startDate.toISOString(),
-              end_at: endDate.toISOString(),
-            }),
-          }
+        // Use BookingService to get availability
+        const availabilityData = await BookingService.searchAvailability(
+          selectedService.service_variation_id,
+          startDate,
+          endDate
         );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch availability");
-        }
-
-        const data = await response.json();
-        const availabilities =
-          data.data?.availabilities_by_date?.[
-            startDate.toISOString().split("T")[0]
-          ] || [];
+        
+        // Get time slots for the selected date
+        const dateKey = startDate.toISOString().split("T")[0];
+        const availabilities = availabilityData.availabilities_by_date[dateKey] || [];
         setAvailableTimes(availabilities);
       } catch (err) {
         console.error("Error fetching availability:", err);
@@ -208,7 +120,7 @@ export default function AppointmentBooking() {
     setSelectedTime(null); // Reset selected time when date changes
   };
 
-  const handleTimeSelection = (time: Availability) => {
+  const handleTimeSelection = (time: TimeSlot) => {
     setSelectedTime(time);
   };
 
@@ -231,33 +143,14 @@ export default function AppointmentBooking() {
         serviceVariationVersion
       );
 
-      // Create booking in API
-      const response = await fetch(
-        `${
-          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
-        }/bookings`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-          body: JSON.stringify({
-            service_variation_id: selectedService.service_variation_id,
-            team_member_id: selectedService.team_member_id.toString(),
-            start_at: selectedTime.start_at,
-            service_variation_version: serviceVariationVersion,
-          }),
-        }
-      );
+      // Use BookingService to create booking
+      const bookingData = await BookingService.createBooking({
+        service_variation_id: selectedService.service_variation_id,
+        team_member_id: selectedService.team_member_id.toString(),
+        start_at: selectedTime.start_at,
+        service_variation_version: serviceVariationVersion,
+      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to create booking");
-      }
-
-      // Parse the response to get booking details
-      const bookingData = await response.json();
       console.log("Booking created:", bookingData);
 
       // Set booking as confirmed and store the ID
@@ -444,13 +337,7 @@ export default function AppointmentBooking() {
                               borderRadius: "4px",
                               textDecoration: "none",
                             }}
-                            onClick={(e) => {
-                              // The Square checkout will open via our custom handler
-                              // After 1 second, simulate payment completion
-                              setTimeout(() => {
-                                setPaymentCompleted(true);
-                              }, 1000);
-                            }}
+                            onClick={handlePayment}
                           >
                             Pay now
                           </a>

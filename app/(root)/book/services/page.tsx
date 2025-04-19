@@ -11,26 +11,7 @@ import {
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-
-interface TeamMember {
-  id: number;
-  square_up_id: string;
-  first_name: string;
-  last_name: string;
-  status: string;
-}
-
-interface Service {
-  id: number;
-  team_member_id: number;
-  name: string;
-  description: string;
-  price_amount: number;
-  price_currency: string;
-  duration: number;
-  service_variation_id: string;
-  square_catalog_id: string;
-}
+import { BookingService, TeamMember, Service } from "@/lib/booking-service";
 
 export default function ServiceSelection() {
   const [barbers, setBarbers] = useState<TeamMember[]>([]);
@@ -53,48 +34,22 @@ export default function ServiceSelection() {
       setError(null);
 
       try {
-        // Fetch team members (barbers)
-        const teamMemberResponse = await fetch(
-          `${
-            process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
-          }/team-members`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          }
-        );
-
-        if (!teamMemberResponse.ok) {
-          throw new Error("Failed to fetch barbers");
-        }
-
-        const teamMemberData = await teamMemberResponse.json();
-        const barberList = teamMemberData.data || [];
+        // Use BookingService to fetch team members (barbers)
+        const barberList = await BookingService.getTeamMembers();
         setBarbers(barberList);
 
         // Fetch services for each barber
         const servicesByBarber: Record<number, Service[]> = {};
 
         for (const barber of barberList) {
-          const serviceResponse = await fetch(
-            `${
-              process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"
-            }/services/team-member/${barber.id}`,
-            {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-              },
-            }
-          );
-
-          if (!serviceResponse.ok) {
-            console.error(`Failed to fetch services for barber ${barber.id}`);
-            continue;
+          try {
+            // Use BookingService to fetch services for each barber
+            const barberServices = await BookingService.getTeamMemberServices(barber.id);
+            servicesByBarber[barber.id] = barberServices;
+          } catch (serviceErr) {
+            console.error(`Failed to fetch services for barber ${barber.id}:`, serviceErr);
+            // Continue with next barber even if one fails
           }
-
-          const serviceData = await serviceResponse.json();
-          servicesByBarber[barber.id] = serviceData.data || [];
         }
 
         setServices(servicesByBarber);
@@ -192,7 +147,11 @@ export default function ServiceSelection() {
                         <br />
                         <sub>
                           ${(service.price_amount / 100).toFixed(2)}{" "}
-                          {service.price_currency} ・ {service.duration > 10000 ? Math.round(service.duration / 60000) : service.duration} min
+                          {service.price_currency} ・{" "}
+                          {service.duration > 10000
+                            ? Math.round(service.duration / 60000)
+                            : service.duration}{" "}
+                          min
                         </sub>
                       </AccordionTrigger>
                       <AccordionContent className="px-10 py-4">
