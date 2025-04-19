@@ -29,7 +29,7 @@ export default function AppointmentBooking() {
   const [selectedTime, setSelectedTime] = useState<TimeSlot | null>(null);
   const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
-  const [bookingId, setBookingId] = useState<string | null>(null);
+  const [, setBookingId] = useState<string | null>(null);
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
 
@@ -252,7 +252,7 @@ export default function AppointmentBooking() {
       return (
         <div className="p-3 bg-green-100 border border-green-300 rounded-lg mb-3 text-sm">
           <p className="text-green-800 font-medium">
-            Booking confirmed! You'll be redirected shortly.
+            Booking confirmed! You&apos;ll be redirected shortly.
           </p>
         </div>
       );
