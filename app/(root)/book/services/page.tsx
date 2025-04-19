@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -30,16 +30,17 @@ export default function ServiceSelection() {
       setError(null);
 
       try {
-        // Use BookingService to fetch team members (barbers)
         const barberList = await BookingService.getTeamMembers();
         setBarbers(barberList);
 
-        // Fetch services for each barber
-        const servicesByBarber: Record<number, Service[]> = {};
+        // Auto-expand first barber if only one exists
+        if (barberList.length === 1) {
+          setExpandedBarber(barberList[0].id);
+        }
 
+        const servicesByBarber: Record<number, Service[]> = {};
         for (const barber of barberList) {
           try {
-            // Use BookingService to fetch services for each barber
             const barberServices = await BookingService.getTeamMemberServices(
               barber.id
             );
@@ -49,7 +50,6 @@ export default function ServiceSelection() {
               `Failed to fetch services for barber ${barber.id}:`,
               serviceErr
             );
-            // Continue with next barber even if one fails
           }
         }
 
@@ -70,32 +70,24 @@ export default function ServiceSelection() {
   }, [isAuthenticated, router]);
 
   const handleBookService = (barberId: number, service: Service) => {
-    // Store selected service and barber info in localStorage for the appointment page
     localStorage.setItem("selectedService", JSON.stringify(service));
     localStorage.setItem("selectedBarberId", barberId.toString());
-
-    // Navigate to appointment page
     router.push("/book/appointment");
   };
 
-  // Toggle accordion expansion
   const toggleAccordion = (barberId: number) => {
     setExpandedBarber(expandedBarber === barberId ? null : barberId);
   };
 
   // Calculate price range for services
   const getPriceRange = (services: Service[]): string => {
-    if (!services || services.length === 0) return "$0.00 AUD";
-
+    if (!services || services.length === 0) return "$0 AUD";
     const prices = services.map((s) => s.price_amount / 100);
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
-
-    if (minPrice === maxPrice) {
-      return `$${minPrice.toFixed(2)} AUD`;
-    }
-
-    return `$${minPrice.toFixed(2)}-$${maxPrice.toFixed(2)} AUD`;
+    return minPrice === maxPrice
+      ? `$${minPrice} AUD`
+      : `$${minPrice}-$${maxPrice} AUD`;
   };
 
   if (isLoading) {
@@ -137,43 +129,49 @@ export default function ServiceSelection() {
             className="container mx-auto flex flex-col md:flex-row justify-center items-start py-10 gap-8 px-4"
           >
             <div className="w-full md:w-80">
-              <Image
-                src={"/assets/barber-1.png"}
-                width={500}
-                height={500}
-                alt={`${barber.first_name} ${barber.last_name}`}
-              />
+              <div className="rounded-lg overflow-hidden shadow-md">
+                <Image
+                  src={"/assets/barber-1.png"}
+                  width={500}
+                  height={500}
+                  alt={`${barber.first_name} ${barber.last_name}`}
+                  className="object-cover"
+                />
+              </div>
             </div>
 
             <div className="w-[1px] h-96 bg-[#D9D9D9] hidden md:block" />
 
             <div className="flex flex-col gap-4 w-full md:w-1/3">
-              <h1 className="text-5xl font-bold">
+              <h1 className="text-4xl md:text-5xl font-bold">
                 {barber.first_name} {barber.last_name}
               </h1>
               <p className="text-lg">
-                [IG@{barber.first_name.toLowerCase()}.barber] ({barber.status})
+                [IG@{barber.first_name.toLowerCase()}.barber]{" "}
+                <span className="ml-1">({barber.status})</span>
               </p>
-              <div className="w-full h-[2px] bg-[#3D3D3D]" />
+              <div className="w-full h-[1px] bg-green-500" />
 
               {/* Services Accordion */}
-              <div className="mt-4">
+              <div className="mt-4 max-w-md">
                 {/* Accordion Header */}
                 <button
                   onClick={() => toggleAccordion(barber.id)}
-                  className="w-full flex justify-between items-center bg-zinc-700 text-white rounded-lg p-4 hover:bg-zinc-600 transition-colors"
+                  className="w-full flex justify-between items-center bg-[#333333] text-white rounded-lg p-4 hover:bg-[#3d3d3d] transition-colors"
+                  aria-expanded={expandedBarber === barber.id}
+                  aria-controls={`services-${barber.id}`}
                 >
                   <div className="text-lg font-medium">
                     View Services
-                    <span className="ml-2 text-gray-300 text-base">
+                    <span className="ml-2 text-gray-300 text-sm">
                       ({getPriceRange(services[barber.id] || [])})
                     </span>
                   </div>
-                  <ChevronDown
-                    className={`h-5 w-5 transition-transform ${
-                      expandedBarber === barber.id ? "rotate-180" : ""
-                    }`}
-                  />
+                  {expandedBarber === barber.id ? (
+                    <ChevronUp className="h-5 w-5" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5" />
+                  )}
                 </button>
 
                 {/* Accordion Content */}
@@ -183,42 +181,29 @@ export default function ServiceSelection() {
                       services[barber.id].map((service) => (
                         <div
                           key={service.id}
-                          className="border border-gray-300 rounded-lg overflow-hidden"
+                          className="bg-[#111111] rounded-lg overflow-hidden mb-4"
                         >
-                          <div className="bg-zinc-700 text-white p-4 flex justify-between items-center">
-                            <div>
-                              {/* Just display the service name as-is, since it already includes the barber info */}
-                              <h3 className="font-bold text-lg">
-                                {service.name}
-                              </h3>
-                              <p className="text-gray-300">
-                                ${(service.price_amount / 100).toFixed(2)} AUD •{" "}
-                                {service.duration > 10000
-                                  ? Math.round(service.duration / 60000)
-                                  : service.duration}{" "}
-                                min{" "}
-                                {service.price_amount > 6000 &&
-                                  "+ [15% Surcharge On Sundays]"}
-                              </p>
+                          <div className="p-4">
+                            <div className="flex flex-col md:flex-row justify-between gap-3">
+                              <div>
+                                <h3 className="font-bold text-lg text-white">
+                                  {service.name}
+                                </h3>
+                                <p className="text-gray-300 text-sm">
+                                  ${(service.price_amount / 100).toFixed(0)} +
+                                  [15% Surcharge On Sundays]
+                                </p>
+                              </div>
+                              <Button
+                                onClick={() =>
+                                  handleBookService(barber.id, service)
+                                }
+                                className="bg-green-600 hover:bg-green-700 text-white text-base px-6 py-2 rounded"
+                              >
+                                Book Now
+                              </Button>
                             </div>
-                            <Button
-                              onClick={() =>
-                                handleBookService(barber.id, service)
-                              }
-                              className="bg-green-600 hover:bg-green-700 text-white"
-                            >
-                              Book Now
-                            </Button>
                           </div>
-
-                          {service.description && (
-                            <div className="p-4 bg-white">
-                              <p>
-                                {service.description ||
-                                  "Experience a professional cut tailored to your style."}
-                              </p>
-                            </div>
-                          )}
                         </div>
                       ))
                     ) : (
