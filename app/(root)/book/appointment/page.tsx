@@ -36,14 +36,14 @@ export default function AppointmentBooking() {
   // Handle payment process
   const handlePayment = (e: React.MouseEvent) => {
     e.preventDefault();
-    
+
     // Open payment link in a popup
     window.open(
       "https://square.link/u/K0DxFxCJ?src=embed",
       "Square Payment",
       "width=500,height=600,scrollbars=yes"
     );
-    
+
     // Simulate successful payment after a short delay
     setTimeout(() => {
       setPaymentCompleted(true);
@@ -95,16 +95,18 @@ export default function AppointmentBooking() {
           startDate,
           endDate
         );
-        
+
         // Get time slots for the selected date
         const dateKey = startDate.toISOString().split("T")[0];
-        const availabilities = availabilityData.availabilities_by_date[dateKey] || [];
-        
+        const availabilities =
+          availabilityData.availabilities_by_date[dateKey] || [];
+
         // Sort times chronologically for better UX
-        availabilities.sort((a, b) => 
-          new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+        availabilities.sort(
+          (a, b) =>
+            new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
         );
-        
+
         setAvailableTimes(availabilities);
       } catch (err) {
         console.error("Error fetching availability:", err);
@@ -204,22 +206,27 @@ export default function AppointmentBooking() {
               <span>
                 {selectedService.duration > 10000
                   ? Math.round(selectedService.duration / 60000)
-                  : selectedService.duration} min
+                  : selectedService.duration}{" "}
+                min
               </span>
             </div>
           </div>
           <div className="p-3 flex justify-between items-center">
             <p className="text-sm">Total</p>
-            <p className="font-medium">${(selectedService.price_amount / 100).toFixed(2)}</p>
+            <p className="font-medium">
+              ${(selectedService.price_amount / 100).toFixed(2)}
+            </p>
           </div>
         </div>
 
         {selectedTime && (
           <div className="mt-3 p-3 border border-green-500 rounded-lg bg-green-50">
-            <p className="font-medium text-sm">Selected Time:</p>
+            <p className="font-medium text-sm mb-1">Selected Time:</p>
             <div className="flex justify-between items-center">
-              <p className="text-base">{formatTime(selectedTime.start_at)}</p>
-              <p className="text-xs">
+              <p className="text-lg font-medium">
+                {formatTime(selectedTime.start_at)}
+              </p>
+              <p className="text-base font-bold">
                 {new Date(selectedTime.start_at).toLocaleDateString("en-US", {
                   weekday: "short",
                   month: "short",
@@ -272,15 +279,20 @@ export default function AppointmentBooking() {
 
     if (selectedTime) {
       return (
-        <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
-          <p className="font-medium mb-2 text-sm">Payment</p>
-          <div className="border border-gray-200 rounded-lg p-3 bg-white shadow-sm">
-            <p className="font-medium mb-3">
-              ${selectedService ? (selectedService.price_amount / 100).toFixed(2) : "0.00"} 
-              {selectedService?.price_currency}
+        <div className="rounded-lg overflow-hidden border border-gray-200">
+          <p className="p-3 font-medium text-base border-b border-gray-100 bg-gray-50">
+            Payment
+          </p>
+          <div className="p-5">
+            <p className="text-xl font-medium mb-4">
+              $
+              {selectedService
+                ? (selectedService.price_amount / 100).toFixed(2)
+                : "0.00"}{" "}
+              AUD
             </p>
-            <Button 
-              className="w-full bg-blue-600 hover:bg-blue-700 py-2 text-white"
+            <Button
+              className="w-full py-3 text-base bg-blue-500 hover:bg-blue-600 text-white rounded-md font-normal"
               onClick={handlePayment}
             >
               Pay now
@@ -307,21 +319,25 @@ export default function AppointmentBooking() {
     if (availableTimes.length === 0) {
       return (
         <div className="bg-gray-50 rounded-lg p-3 text-center text-sm">
-          <p>No available times for the selected date. Please try another date.</p>
+          <p>
+            No available times for the selected date. Please try another date.
+          </p>
         </div>
       );
     }
 
     return (
-      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+      <div className="flex flex-wrap gap-4">
         {availableTimes.map((time, index) => (
           <Button
             key={index}
-            variant={selectedTime?.start_at === time.start_at ? "default" : "outline"}
-            className={`rounded-md text-xs py-1.5 ${
-              selectedTime?.start_at === time.start_at 
-                ? "bg-black text-white" 
-                : "hover:bg-gray-100"
+            variant={
+              selectedTime?.start_at === time.start_at ? "default" : "outline"
+            }
+            className={`min-w-[100px] rounded-md py-2.5 px-4 text-sm ${
+              selectedTime?.start_at === time.start_at
+                ? "bg-black text-white"
+                : "bg-white border border-gray-200 text-gray-800 hover:bg-gray-100"
             }`}
             onClick={() => handleTimeSelection(time)}
           >
@@ -344,24 +360,26 @@ export default function AppointmentBooking() {
   }
 
   return (
-    <main className="flex flex-col gap-6 mt-24 mb-16">
+    <main className="flex flex-col gap-6 mt-30 mb-16">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left column - Calendar and time selection */}
           <div className="bg-white rounded-lg shadow-sm p-4">
-            <h2 className="text-base font-semibold mb-3">Please select a date and time</h2>
+            <h2 className="text-base font-semibold mb-3">
+              Please select a date and time
+            </h2>
             <BookingCalendar
               selectedDate={selectedDate}
               onChange={handleDateChange}
             />
-            
+
             {/* Available times section */}
             <div className="mt-5">
               <h3 className="text-base font-semibold mb-3">Available Times</h3>
               {renderAvailableTimes()}
             </div>
           </div>
-          
+
           {/* Right column - Booking summary and payment */}
           <div className="bg-white rounded-lg shadow-sm p-4">
             <h2 className="text-base font-semibold mb-3">SUMMARY</h2>
