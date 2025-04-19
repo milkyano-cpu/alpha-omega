@@ -192,7 +192,7 @@ export default function ServiceSelection() {
                         <br />
                         <sub>
                           ${(service.price_amount / 100).toFixed(2)}{" "}
-                          {service.price_currency} ・ {service.duration} min
+                          {service.price_currency} ・ {service.duration > 10000 ? Math.round(service.duration / 60000) : service.duration} min
                         </sub>
                       </AccordionTrigger>
                       <AccordionContent className="px-10 py-4">

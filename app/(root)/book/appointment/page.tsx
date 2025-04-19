@@ -229,7 +229,7 @@ export default function AppointmentBooking() {
                   ${(selectedService.price_amount / 100).toFixed(2)}{" "}
                   {selectedService.price_currency}
                 </sub>
-                <sub>{selectedService.duration} Mins</sub>
+                <sub>{selectedService.duration > 10000 ? Math.round(selectedService.duration / 60000) : selectedService.duration} Mins</sub>
               </div>
             </div>
 
