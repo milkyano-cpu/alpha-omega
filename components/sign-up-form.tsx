@@ -52,6 +52,7 @@ const signUpSchema = z.object({
         try {
           return isPossiblePhoneNumber(value);
         } catch (error) {
+          console.log("error", error);
           return false;
         }
       },
@@ -73,7 +74,7 @@ export function SignUpForm({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState("+61"); // Default to Australia
+  const [, setPhoneNumber] = useState("+61"); // Default to Australia
   const router = useRouter();
 
   const form = useForm<SignUpFormValues>({
@@ -214,10 +215,11 @@ export function SignUpForm({
                         className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
                         onClick={() => setShowPassword(!showPassword)}
                       >
-                        {showPassword ? 
-                          <EyeOff className="h-5 w-5" /> : 
+                        {showPassword ? (
+                          <EyeOff className="h-5 w-5" />
+                        ) : (
                           <Eye className="h-5 w-5" />
-                        }
+                        )}
                       </button>
                     </div>
                     <FormMessage />
