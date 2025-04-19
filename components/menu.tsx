@@ -17,6 +17,12 @@ import {
 
 export function Menu() {
   const { user, isAuthenticated, logout } = useAuth();
+  // Use state to track client-side rendering
+  const [isClient, setIsClient] = React.useState(false);
+  
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
   
   const handleLogout = () => {
     logout();
@@ -27,22 +33,24 @@ export function Menu() {
     <NavigationMenu className="w-full">
       <NavigationMenuList>
         <NavigationMenuItem className="ml-auto hidden md:block">
-          {isAuthenticated ? (
-            <div className="flex items-center gap-4">
-              <span className="text-sm">
-                Hello, {user?.first_name || 'User'}
-              </span>
-              <button 
-                onClick={handleLogout} 
-                className={navigationMenuTriggerStyle()}
-              >
-                LOGOUT
-              </button>
-            </div>
-          ) : (
-            <Link href="/login" className={navigationMenuTriggerStyle()}>
-              LOGIN
-            </Link>
+          {isClient && (
+            isAuthenticated ? (
+              <div className="flex items-center gap-4">
+                <span className="text-sm">
+                  Hello, {user?.first_name || 'User'}
+                </span>
+                <button 
+                  onClick={handleLogout} 
+                  className={navigationMenuTriggerStyle()}
+                >
+                  LOGOUT
+                </button>
+              </div>
+            ) : (
+              <Link href="/login" className={navigationMenuTriggerStyle()}>
+                LOGIN
+              </Link>
+            )
           )}
         </NavigationMenuItem>
 
@@ -76,7 +84,7 @@ export function Menu() {
               
               {/* Authentication Links */}
               <div className="pt-4 mt-4 border-t border-gray-200">
-                {isAuthenticated ? (
+                {isClient && isAuthenticated ? (
                   <>
                     <div className="mb-3 text-sm font-medium px-3">
                       Logged in as {user?.first_name || 'User'}

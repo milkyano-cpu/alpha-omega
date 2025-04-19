@@ -70,36 +70,36 @@ export function BookingCalendar({
   };
 
   return (
-    <div className="w-full mx-auto p-6 bg-white rounded-lg shadow-sm">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">
+    <div className="w-full mx-auto p-4 bg-white rounded-lg shadow-sm">
+      <div className="flex justify-between items-center mb-3">
+        <h2 className="text-lg font-bold">
           {currentMonth.format("MMMM YYYY")}
         </h2>
-        <div className="flex gap-2">
+        <div className="flex gap-1">
           <button
             onClick={prevMonth}
-            className="p-2 border rounded hover:bg-gray-100 transition-colors"
+            className="p-1 border rounded hover:bg-gray-100 transition-colors"
             aria-label="Previous month"
           >
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft className="h-4 w-4" />
           </button>
           <button
             onClick={nextMonth}
-            className="p-2 border rounded hover:bg-gray-100 transition-colors"
+            className="p-1 border rounded hover:bg-gray-100 transition-colors"
             aria-label="Next month"
           >
-            <ChevronRight className="h-5 w-5" />
+            <ChevronRight className="h-4 w-4" />
           </button>
         </div>
       </div>
-      <div className="grid grid-cols-7 text-center text-gray-500">
+      <div className="grid grid-cols-7 text-center text-gray-500 text-xs">
         {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
-          <div key={day} className="font-semibold p-2">
+          <div key={day} className="font-semibold p-1">
             {day}
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 gap-1">
         {[
           ...Array(firstDayOfMonth).fill(null),
           ...Array(daysInMonth).keys(),
@@ -111,7 +111,7 @@ export function BookingCalendar({
           return (
             <div
               key={index}
-              className={`p-4 text-center rounded-md ${
+              className={`p-2 text-center text-sm rounded-md ${
                 dayNumber !== null
                   ? isDisabled
                     ? "text-gray-300 cursor-not-allowed"

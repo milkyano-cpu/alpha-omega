@@ -37,8 +37,90 @@ export default function AppointmentBooking() {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [creating, setCreating] = useState(false);
   const [selectedTime, setSelectedTime] = useState<Availability | null>(null);
+  const [paymentCompleted, setPaymentCompleted] = useState(false);
+  const [bookingConfirmed, setBookingConfirmed] = useState(false);
+  const [bookingId, setBookingId] = useState<string | null>(null);
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
+
+  // Square payment checkout script
+  useEffect(() => {
+    // Only add the script if it doesn't already exist
+    if (typeof window !== "undefined") {
+      const handleCheckoutClick = (e: MouseEvent) => {
+        e.preventDefault();
+
+        const button = e.currentTarget as HTMLAnchorElement;
+        const url = button.getAttribute("data-url");
+        const title = "Square Payment Links";
+
+        // Some platforms embed in an iframe, so we want to top window to calculate sizes correctly
+        const topWindow = window.top ? window.top : window;
+
+        // Fixes dual-screen position                             Most browsers      Firefox
+        const dualScreenLeft =
+          topWindow.screenLeft !== undefined
+            ? topWindow.screenLeft
+            : window.screenX;
+        const dualScreenTop =
+          topWindow.screenTop !== undefined
+            ? topWindow.screenTop
+            : window.screenY;
+
+        const width = topWindow.innerWidth
+          ? topWindow.innerWidth
+          : document.documentElement.clientWidth
+          ? document.documentElement.clientWidth
+          : screen.width;
+        const height = topWindow.innerHeight
+          ? topWindow.innerHeight
+          : document.documentElement.clientHeight
+          ? document.documentElement.clientHeight
+          : screen.height;
+
+        const h = height * 0.75;
+        const w = 500;
+
+        const systemZoom = width / window.screen.availWidth;
+        const left = (width - w) / 2 / systemZoom + dualScreenLeft;
+        const top = (height - h) / 2 / systemZoom + dualScreenTop;
+
+        if (url) {
+          const newWindow = window.open(
+            url,
+            title,
+            `scrollbars=yes, width=${w / systemZoom}, height=${
+              h / systemZoom
+            }, top=${top}, left=${left}`
+          );
+          if (newWindow && window.focus) newWindow.focus();
+        }
+      };
+
+      // Add click event listener after component mounts
+      setTimeout(() => {
+        const checkoutButton = document.getElementById(
+          "embedded-checkout-modal-checkout-button"
+        );
+        if (checkoutButton) {
+          checkoutButton.addEventListener("click", handleCheckoutClick as any);
+        }
+      }, 1000);
+
+      // Clean up event listener when component unmounts
+      return () => {
+        const checkoutButton = document.getElementById(
+          "embedded-checkout-modal-checkout-button"
+        );
+        if (checkoutButton) {
+          checkoutButton.removeEventListener(
+            "click",
+            handleCheckoutClick as any
+          );
+        }
+      };
+    }
+  }, [selectedTime, paymentCompleted]); // Re-run when selectedTime or payment completion changes
 
   // Load selected service from localStorage
   useEffect(() => {
@@ -130,9 +212,10 @@ export default function AppointmentBooking() {
     setSelectedTime(time);
   };
 
+  // Function to handle booking confirmation after payment
   const handleBookingConfirmation = async () => {
-    if (!selectedService || !selectedTime || !user) {
-      setError("Please select a service, date, and time");
+    if (!selectedService || !selectedTime || !user || !paymentCompleted) {
+      setError("Please complete payment first");
       return;
     }
 
@@ -173,12 +256,25 @@ export default function AppointmentBooking() {
         throw new Error(errorData.message || "Failed to create booking");
       }
 
-      // Booking successful, clear localStorage
-      localStorage.removeItem("selectedService");
-      localStorage.removeItem("selectedBarberId");
+      // Parse the response to get booking details
+      const bookingData = await response.json();
+      console.log("Booking created:", bookingData);
 
-      // Redirect to confirmation page or home
-      router.push("/book/thank-you");
+      // Set booking as confirmed and store the ID
+      setBookingConfirmed(true);
+      if (bookingData?.data?.id) {
+        setBookingId(bookingData.data.id.toString());
+      }
+
+      // After a brief delay, redirect to thank you page
+      setTimeout(() => {
+        // Clear localStorage
+        localStorage.removeItem("selectedService");
+        localStorage.removeItem("selectedBarberId");
+
+        // Redirect to confirmation page
+        router.push("/book/thank-you");
+      }, 2000);
     } catch (err) {
       console.error("Error creating booking:", err);
       setError(err instanceof Error ? err.message : "Failed to create booking");
@@ -199,7 +295,7 @@ export default function AppointmentBooking() {
 
   if (!selectedService) {
     return (
-      <main className="flex flex-col gap-20 mt-20">
+      <main className="flex flex-col gap-3 mt-3">
         <section className="container mx-auto text-center py-20">
           <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="mt-4">Loading service information...</p>
@@ -209,19 +305,24 @@ export default function AppointmentBooking() {
   }
 
   return (
-    <main className="flex flex-col gap-20 mt-20">
-      <section className="flex flex-col md:flex-row gap-8 py-20 justify-center px-4">
-        <div className="w-full md:w-auto">
+    <main className="flex flex-col gap-3 mt-25">
+      <section className="flex flex-col md:flex-row gap-6 py-4 justify-center px-4">
+        <div className="w-full md:w-1/2 lg:w-5/12">
+          <h2 className="text-lg font-semibold mb-3 text-center">
+            Please select a date and time
+          </h2>
           <BookingCalendar
             selectedDate={selectedDate}
             onChange={handleDateChange}
           />
         </div>
 
-        <div className="flex flex-col w-full md:w-80">
-          <b>APPOINTMENT SUMMARY</b>
+        <div className="flex flex-col w-full md:w-1/2 lg:w-5/12">
+          <div className="md:mt-6">
+            <h2 className="text-lg font-bold mb-2">SUMMARY</h2>
+          </div>
 
-          <div className="flex flex-col border border-black rounded-xl mt-4">
+          <div className="flex flex-col border border-black rounded-xl mt-2">
             <div className="flex flex-col gap-4 p-4 border-b border-black">
               <p>{selectedService.name}</p>
               <div className="flex gap-8">
@@ -229,7 +330,12 @@ export default function AppointmentBooking() {
                   ${(selectedService.price_amount / 100).toFixed(2)}{" "}
                   {selectedService.price_currency}
                 </sub>
-                <sub>{selectedService.duration > 10000 ? Math.round(selectedService.duration / 60000) : selectedService.duration} Mins</sub>
+                <sub>
+                  {selectedService.duration > 10000
+                    ? Math.round(selectedService.duration / 60000)
+                    : selectedService.duration}{" "}
+                  Mins
+                </sub>
               </div>
             </div>
 
@@ -259,30 +365,120 @@ export default function AppointmentBooking() {
             </div>
           )}
 
-          <Button
-            onClick={handleBookingConfirmation}
-            disabled={!selectedTime || creating}
-            className="mt-6"
-          >
-            {creating ? "Creating Booking..." : "Confirm Booking"}
-          </Button>
+          <div className="mt-6 space-y-4">
+            {paymentCompleted ? (
+              <>
+                {!bookingConfirmed ? (
+                  <>
+                    <div className="p-3 bg-green-100 border border-green-300 rounded-md mb-4">
+                      <p className="text-green-800 font-medium">
+                        Payment completed! Please confirm your booking.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={handleBookingConfirmation}
+                      disabled={creating}
+                      className="w-full"
+                    >
+                      {creating ? "Creating Booking..." : "Confirm Booking"}
+                    </Button>
+                  </>
+                ) : (
+                  <div className="p-3 bg-green-100 border border-green-300 rounded-md mb-4">
+                    <p className="text-green-800 font-medium">
+                      Booking confirmed! You'll be redirected shortly.
+                    </p>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {selectedTime && (
+                  <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                    <p className="font-semibold mb-2">Payment</p>
+                    <div>
+                      <div
+                        style={{
+                          overflow: "auto",
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "flex-end",
+                          alignItems: "center",
+                          width: "100%",
+                          background: "#FFFFFF",
+                          border: "1px solid rgba(0, 0, 0, 0.1)",
+                          borderRadius: "10px",
+                          fontFamily: "SQ Market, Helvetica, Arial, sans-serif",
+                        }}
+                      >
+                        <div style={{ padding: "20px", width: "100%" }}>
+                          <p
+                            style={{
+                              fontSize: "18px",
+                              lineHeight: "20px",
+                              fontWeight: 600,
+                              marginBottom: "15px",
+                            }}
+                          >
+                            $
+                            {selectedService
+                              ? (selectedService.price_amount / 100).toFixed(2)
+                              : "0.00"}{" "}
+                            {selectedService?.price_currency}
+                          </p>
+                          <a
+                            target="_blank"
+                            data-url="https://square.link/u/K0DxFxCJ?src=embd"
+                            href="https://square.link/u/K0DxFxCJ?src=embed"
+                            id="embedded-checkout-modal-checkout-button"
+                            style={{
+                              display: "inline-block",
+                              fontSize: "18px",
+                              lineHeight: "48px",
+                              height: "48px",
+                              color: "#ffffff",
+                              width: "100%",
+                              backgroundColor: "#006aff",
+                              textAlign: "center",
+                              boxShadow: "0 0 0 1px rgba(0,0,0,.1) inset",
+                              borderRadius: "4px",
+                              textDecoration: "none",
+                            }}
+                            onClick={(e) => {
+                              // The Square checkout will open via our custom handler
+                              // After 1 second, simulate payment completion
+                              setTimeout(() => {
+                                setPaymentCompleted(true);
+                              }, 1000);
+                            }}
+                          >
+                            Pay now
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </section>
 
-      <section className="flex flex-col gap-8 container mx-auto mb-40 px-4">
+      <section className="flex flex-col gap-1 container mx-auto mt-0 mb-4 px-4">
         <h2 className="text-xl font-bold">Available Times</h2>
 
         {isLoading ? (
-          <div className="text-center py-10">
+          <div className="text-center py-4">
             <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
             <p className="mt-2">Loading available times...</p>
           </div>
         ) : availableTimes.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
             {availableTimes.map((time, index) => (
               <Button
                 key={index}
-                className={`rounded-md px-4 py-2 text-base ${
+                className={`rounded-md px-3 py-1 text-sm md:text-base ${
                   selectedTime?.start_at === time.start_at ? "bg-green-600" : ""
                 }`}
                 onClick={() => handleTimeSelection(time)}
@@ -292,7 +488,7 @@ export default function AppointmentBooking() {
             ))}
           </div>
         ) : (
-          <p className="text-center py-10">
+          <p className="text-center py-4">
             No available times for the selected date. Please try another date.
           </p>
         )}
