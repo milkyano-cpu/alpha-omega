@@ -8,12 +8,14 @@ interface BookingCalendarProps {
   selectedDate?: Date;
   onChange?: (date: Date) => void;
   availableDates?: string[];
+  onMonthChange?: (date: Date) => void;
 }
 
 export function BookingCalendar({
   selectedDate: propSelectedDate,
   onChange,
   availableDates = [],
+  onMonthChange,
 }: BookingCalendarProps) {
   // Use dayjs for consistent date handling
   const [currentMonth, setCurrentMonth] = useState(dayjs().startOf("month"));
@@ -41,8 +43,21 @@ export function BookingCalendar({
   const daysInMonth = currentMonth.daysInMonth();
   const firstDayOfMonth = currentMonth.startOf("month").day();
 
-  const prevMonth = () => setCurrentMonth(currentMonth.subtract(1, "month"));
-  const nextMonth = () => setCurrentMonth(currentMonth.add(1, "month"));
+  const prevMonth = () => {
+    const newMonth = currentMonth.subtract(1, "month");
+    setCurrentMonth(newMonth);
+    if (onMonthChange) {
+      onMonthChange(newMonth.toDate());
+    }
+  };
+  
+  const nextMonth = () => {
+    const newMonth = currentMonth.add(1, "month");
+    setCurrentMonth(newMonth);
+    if (onMonthChange) {
+      onMonthChange(newMonth.toDate());
+    }
+  };
 
   const handleDateSelection = (day: number) => {
     // Create a new date object for the selected day in the current month

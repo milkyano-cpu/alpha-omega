@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { BookingCalendar } from "@/components/ui/calendar";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { BookingService, TimeSlot } from "@/lib/booking-service";
+import { AvailabilityResponse, BookingService, TimeSlot } from "@/lib/booking-service";
 
 interface Service {
   id: number;
@@ -27,6 +27,8 @@ export default function AppointmentBooking() {
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Cache for already fetched months - key is 'YYYY-MM'
+  const [monthCache, setMonthCache] = useState<Record<string, AvailabilityResponse>>({});
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [creating, setCreating] = useState(false);
   const [selectedTime, setSelectedTime] = useState<TimeSlot | null>(null);
@@ -81,7 +83,37 @@ export default function AppointmentBooking() {
   useEffect(() => {
     if (!selectedService) return;
 
+    // Extract month and year for dependency tracking and caching
+    const currentMonth = selectedDate.getMonth();
+    const currentYear = selectedDate.getFullYear();
+    const cacheKey = `${currentYear}-${currentMonth}`;
+    
     const fetchAvailabilityData = async () => {
+      // Check if we already have this month in cache
+      if (monthCache[cacheKey]) {
+        console.log(`Using cached data for ${cacheKey}`);
+        // Use cached data
+        const cachedData = monthCache[cacheKey];
+        setAvailabilityData(cachedData);
+        
+        // Extract available dates from cached data
+        const dates = Object.keys(cachedData.availabilities_by_date);
+        setAvailableDates(dates);
+        
+        // Update time slots for selected date
+        const dateKey = selectedDate.toISOString().split("T")[0];
+        const availabilities = cachedData.availabilities_by_date[dateKey] || [];
+        
+        // Sort times chronologically
+        availabilities.sort(
+          (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+        );
+        
+        setAvailableTimes(availabilities);
+        return;
+      }
+      
+      // If not in cache, fetch new data
       setIsLoading(true);
       setError(null);
 
@@ -91,19 +123,19 @@ export default function AppointmentBooking() {
         // Otherwise, start from the 1st of the month
         const now = new Date();
         const isCurrentMonth = 
-          now.getMonth() === selectedDate.getMonth() && 
-          now.getFullYear() === selectedDate.getFullYear();
+          now.getMonth() === currentMonth && 
+          now.getFullYear() === currentYear;
         
         // Start date - either today or 1st of month
         const startDate = isCurrentMonth 
           ? new Date(now.setHours(0, 0, 0, 0)) 
-          : new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+          : new Date(currentYear, currentMonth, 1);
         
         // End date - last day of the month
-        const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+        const endDate = new Date(currentYear, currentMonth + 1, 0);
         endDate.setHours(23, 59, 59, 999);
 
-        console.log('Fetching availability from', startDate.toISOString(), 'to', endDate.toISOString());
+        console.log(`Fetching availability for ${cacheKey} from`, startDate.toISOString(), 'to', endDate.toISOString());
         
         // Make a single request for the entire date range
         const response = await BookingService.searchAvailability(
@@ -112,12 +144,18 @@ export default function AppointmentBooking() {
           endDate
         );
 
-        // Store the full response
+        // Store the response in cache
+        setMonthCache(prev => ({
+          ...prev,
+          [cacheKey]: response
+        }));
+        
+        // Update state with response data
         setAvailabilityData(response);
         
         // Extract available dates
         const dates = Object.keys(response.availabilities_by_date);
-        console.log('Available dates:', dates);
+        console.log(`${cacheKey} available dates:`, dates);
         setAvailableDates(dates);
         
         // If the selected date has available times, set them
@@ -139,7 +177,8 @@ export default function AppointmentBooking() {
     };
 
     fetchAvailabilityData();
-  }, [selectedDate.getMonth(), selectedDate.getFullYear(), selectedService]);
+    
+  }, [selectedDate.getMonth(), selectedDate.getFullYear(), selectedService, monthCache]);
 
   // Update available times when selected date changes
   useEffect(() => {
@@ -164,6 +203,34 @@ export default function AppointmentBooking() {
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
     setSelectedTime(null); // Reset selected time when date changes
+  };
+
+  // Handle month changes from the calendar
+  const handleMonthChange = (date: Date) => {
+    console.log('Month changed to:', date);
+    // Clear any previously selected time
+    setSelectedTime(null);
+    
+    // Create cache key for the target month
+    const targetMonth = date.getMonth();
+    const targetYear = date.getFullYear();
+    const cacheKey = `${targetYear}-${targetMonth}`;
+    
+    // Check if month data is already in cache
+    const isCached = !!monthCache[cacheKey];
+    
+    // Only show loading state if we need to fetch
+    if (!isCached) {
+      // Reset available times until we get new data
+      setAvailableTimes([]);
+      console.log(`No cached data for ${cacheKey}, will fetch`);
+    } else {
+      console.log(`Found cached data for ${cacheKey}, no need to fetch`);
+    }
+    
+    // Update selectedDate to the first day of the new month
+    const newMonthDate = new Date(date.getFullYear(), date.getMonth(), 1);
+    setSelectedDate(newMonthDate);
   };
 
   const handleTimeSelection = (time: TimeSlot) => {
@@ -347,15 +414,6 @@ export default function AppointmentBooking() {
 
   // Render available times section
   const renderAvailableTimes = () => {
-    if (isLoading) {
-      return (
-        <div className="flex items-center justify-center py-4">
-          <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <p className="ml-3 text-sm">Loading available times...</p>
-        </div>
-      );
-    }
-
     if (availableTimes.length === 0) {
       return (
         <div className="bg-gray-50 rounded-lg p-3 text-center text-sm">
@@ -387,6 +445,53 @@ export default function AppointmentBooking() {
       </div>
     );
   };
+  
+  // Skeleton loader for calendar
+  const renderCalendarSkeleton = () => (
+    <div className="w-full mx-auto p-4 bg-white rounded-lg shadow-sm">
+      {/* Month and navigation header */}
+      <div className="flex justify-between items-center mb-3">
+        <div className="h-6 w-32 bg-gray-200 rounded animate-pulse"></div>
+        <div className="flex gap-1">
+          <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
+          <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+      </div>
+      
+      {/* Days of week */}
+      <div className="grid grid-cols-7 text-center gap-1 mb-2">
+        {Array(7).fill(0).map((_, i) => (
+          <div key={i} className="h-4 bg-gray-200 rounded animate-pulse"></div>
+        ))}
+      </div>
+      
+      {/* Calendar grid - 5 weeks */}
+      {Array(5).fill(0).map((_, week) => (
+        <div key={week} className="grid grid-cols-7 gap-1 mb-1">
+          {Array(7).fill(0).map((_, day) => (
+            <div 
+              key={`${week}-${day}`} 
+              className="h-10 bg-gray-200 rounded-md animate-pulse"
+              style={{ animationDelay: `${(week * 7 + day) * 50}ms` }}
+            ></div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+  
+  // Skeleton loader for time slots
+  const renderTimeSlotsSkeleton = () => (
+    <div className="flex flex-wrap gap-4">
+      {Array(8).fill(0).map((_, i) => (
+        <div 
+          key={i} 
+          className="min-w-[100px] h-10 bg-gray-200 rounded-md animate-pulse"
+          style={{ animationDelay: `${i * 100}ms` }}
+        ></div>
+      ))}
+    </div>
+  );
 
   if (!selectedService) {
     return (
@@ -408,15 +513,13 @@ export default function AppointmentBooking() {
             <h2 className="text-base font-semibold mb-3">
               Please select a date and time
             </h2>
-            {isLoading && !availabilityData ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                <p className="ml-3">Loading calendar...</p>
-              </div>
+            {isLoading ? (
+              renderCalendarSkeleton()
             ) : (
               <BookingCalendar
                 selectedDate={selectedDate}
                 onChange={handleDateChange}
+                onMonthChange={handleMonthChange}
                 availableDates={availableDates}
               />
             )}
@@ -424,7 +527,7 @@ export default function AppointmentBooking() {
             {/* Available times section */}
             <div className="mt-5">
               <h3 className="text-base font-semibold mb-3">Available Times</h3>
-              {renderAvailableTimes()}
+              {isLoading ? renderTimeSlotsSkeleton() : renderAvailableTimes()}
             </div>
           </div>
 
