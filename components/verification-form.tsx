@@ -29,6 +29,7 @@ export function VerificationForm({
   useEffect(() => {
     const phone = searchParams.get("phone");
     if (phone) {
+      // Use the phone number as-is - our backend will handle formatting
       setPhoneNumber(phone);
     } else {
       // If no phone number is provided, redirect back to signup
@@ -91,6 +92,8 @@ export function VerificationForm({
     setError(null);
 
     try {
+      // Ensure phone number is in a clean format before sending to backend
+      // Just pass it as-is - backend will handle proper formatting
       const response = await verify(phoneNumber, otpCode);
 
       // On successful verification, redirect to home or dashboard
@@ -131,6 +134,9 @@ export function VerificationForm({
           {error && (
             <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md mb-4">
               {error}
+              {error?.includes("invalid") || error?.includes("Invalid") ? 
+                <p className="mt-1 text-xs">Please check your SMS and try again with the exact code.</p> : null
+              }
             </div>
           )}
 

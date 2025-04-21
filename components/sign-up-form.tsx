@@ -43,21 +43,30 @@ const signUpSchema = z.object({
     .regex(/[0-9]/, { message: "Password must contain at least one number" }),
   phone_number: z
     .string()
-    .min(8, { message: "Phone number is required" })
-    .refine((value) => value.startsWith("+"), {
+    .min(1, { message: "Phone number is required" })
+    .refine((value) => value.startsWith("+ ") || value.startsWith("+"), {
       message: "Phone number must start with a country code (e.g., +61)",
     })
     .refine(
       (value) => {
         try {
-          return isPossiblePhoneNumber(value);
+          // Clean up the value for validation
+          const cleaned = value.replace(/\s+/g, "");
+
+          // Check for valid international format
+          if (cleaned.length < 8) return false;
+
+          // Simple pattern check: +countryCode(digits)
+          return (
+            /^\+[1-9]\d{6,14}$/.test(cleaned) || isPossiblePhoneNumber(value)
+          );
         } catch (error) {
-          console.log("error", error);
+          console.log("Phone validation error:", error);
           return false;
         }
       },
       {
-        message: "Please enter a valid phone number",
+        message: "Please enter a valid phone number with country code",
       }
     ),
   birthday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, {
@@ -240,8 +249,10 @@ export function SignUpForm({
                           international
                           value={field.value}
                           onChange={(value) => {
-                            field.onChange(value || "+61");
-                            setPhoneNumber(value || "+61");
+                            // Ensure value is always a string with country code
+                            const formattedValue = value || "+61";
+                            field.onChange(formattedValue);
+                            setPhoneNumber(formattedValue);
                           }}
                           className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                           placeholder="+61 412 123 456"
