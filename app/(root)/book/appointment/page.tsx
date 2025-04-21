@@ -20,8 +20,11 @@ interface Service {
 }
 
 export default function AppointmentBooking() {
+  // State related to availability and dates
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [availabilityData, setAvailabilityData] = useState<AvailabilityResponse | null>(null);
   const [availableTimes, setAvailableTimes] = useState<TimeSlot[]>([]);
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -74,52 +77,89 @@ export default function AppointmentBooking() {
   }, [isAuthenticated, router]);
 
   // Fetch available times when date changes
+  // Fetch availability data when month changes or service changes
   useEffect(() => {
     if (!selectedService) return;
 
-    const fetchAvailability = async () => {
+    const fetchAvailabilityData = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        // Format date for API request
-        const startDate = new Date(selectedDate);
-        startDate.setHours(0, 0, 0, 0);
-
-        const endDate = new Date(selectedDate);
+        // Calculate date range
+        // If we're in the current month, start from today
+        // Otherwise, start from the 1st of the month
+        const now = new Date();
+        const isCurrentMonth = 
+          now.getMonth() === selectedDate.getMonth() && 
+          now.getFullYear() === selectedDate.getFullYear();
+        
+        // Start date - either today or 1st of month
+        const startDate = isCurrentMonth 
+          ? new Date(now.setHours(0, 0, 0, 0)) 
+          : new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+        
+        // End date - last day of the month
+        const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
         endDate.setHours(23, 59, 59, 999);
 
-        // Use BookingService to get availability
-        const availabilityData = await BookingService.searchAvailability(
+        console.log('Fetching availability from', startDate.toISOString(), 'to', endDate.toISOString());
+        
+        // Make a single request for the entire date range
+        const response = await BookingService.searchAvailability(
           selectedService.service_variation_id,
           startDate,
           endDate
         );
 
-        // Get time slots for the selected date
-        const dateKey = startDate.toISOString().split("T")[0];
-        const availabilities =
-          availabilityData.availabilities_by_date[dateKey] || [];
-
-        // Sort times chronologically for better UX
+        // Store the full response
+        setAvailabilityData(response);
+        
+        // Extract available dates
+        const dates = Object.keys(response.availabilities_by_date);
+        console.log('Available dates:', dates);
+        setAvailableDates(dates);
+        
+        // If the selected date has available times, set them
+        const dateKey = selectedDate.toISOString().split("T")[0];
+        const availabilities = response.availabilities_by_date[dateKey] || [];
+        
+        // Sort times chronologically
         availabilities.sort(
-          (a, b) =>
-            new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+          (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
         );
-
+        
         setAvailableTimes(availabilities);
       } catch (err) {
         console.error("Error fetching availability:", err);
-        setError(
-          err instanceof Error ? err.message : "Failed to load available times"
-        );
+        setError(err instanceof Error ? err.message : "Failed to load availability");
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchAvailability();
-  }, [selectedDate, selectedService]);
+    fetchAvailabilityData();
+  }, [selectedDate.getMonth(), selectedDate.getFullYear(), selectedService]);
+
+  // Update available times when selected date changes
+  useEffect(() => {
+    if (!availabilityData) return;
+    
+    // Get the key for the selected date
+    const dateKey = selectedDate.toISOString().split("T")[0];
+    
+    // Get available times for this date from the existing data
+    const availabilities = availabilityData.availabilities_by_date[dateKey] || [];
+    
+    // Sort times chronologically
+    availabilities.sort(
+      (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+    );
+    
+    console.log(`Found ${availabilities.length} available slots for ${dateKey}`);
+    setAvailableTimes(availabilities);
+    setSelectedTime(null); // Reset selected time when date changes
+  }, [selectedDate, availabilityData]);
 
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
@@ -368,10 +408,18 @@ export default function AppointmentBooking() {
             <h2 className="text-base font-semibold mb-3">
               Please select a date and time
             </h2>
-            <BookingCalendar
-              selectedDate={selectedDate}
-              onChange={handleDateChange}
-            />
+            {isLoading && !availabilityData ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                <p className="ml-3">Loading calendar...</p>
+              </div>
+            ) : (
+              <BookingCalendar
+                selectedDate={selectedDate}
+                onChange={handleDateChange}
+                availableDates={availableDates}
+              />
+            )}
 
             {/* Available times section */}
             <div className="mt-5">

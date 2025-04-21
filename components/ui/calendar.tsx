@@ -7,11 +7,13 @@ import dayjs from "dayjs";
 interface BookingCalendarProps {
   selectedDate?: Date;
   onChange?: (date: Date) => void;
+  availableDates?: string[];
 }
 
 export function BookingCalendar({
   selectedDate: propSelectedDate,
   onChange,
+  availableDates = [],
 }: BookingCalendarProps) {
   // Use dayjs for consistent date handling
   const [currentMonth, setCurrentMonth] = useState(dayjs().startOf("month"));
@@ -60,6 +62,19 @@ export function BookingCalendar({
     return date.isBefore(dayjs().startOf("day"));
   };
 
+  // Check if a day is available for booking
+  const isDateAvailable = (day: number) => {
+    // If no available dates provided, all future dates are considered available
+    if (!availableDates || availableDates.length === 0) return true;
+    
+    // Create a date string in YYYY-MM-DD format for comparison
+    const date = currentMonth.date(day);
+    const dateString = date.format('YYYY-MM-DD');
+    
+    // Check if this date is in the available dates array
+    return availableDates.includes(dateString);
+  };
+
   // Check if a day is the selected date (considering month and year)
   const isSelectedDay = (day: number) => {
     return (
@@ -105,7 +120,9 @@ export function BookingCalendar({
           ...Array(daysInMonth).keys(),
         ].map((day, index) => {
           const dayNumber = day !== null ? day + 1 : null;
-          const isDisabled = dayNumber !== null && isPastDate(dayNumber);
+          const isPast = dayNumber !== null && isPastDate(dayNumber);
+          const isAvailable = dayNumber !== null && isDateAvailable(dayNumber);
+          const isDisabled = isPast || !isAvailable;
           const isSelected = dayNumber !== null && isSelectedDay(dayNumber);
 
           return (
@@ -114,7 +131,9 @@ export function BookingCalendar({
               className={`p-2 text-center text-sm rounded-md ${
                 dayNumber !== null
                   ? isDisabled
-                    ? "text-gray-300 cursor-not-allowed"
+                    ? isPast 
+                      ? "text-gray-300 cursor-not-allowed" 
+                      : "text-gray-400 bg-gray-100 cursor-not-allowed"
                     : "hover:bg-gray-200 cursor-pointer"
                   : ""
               } ${isSelected ? "bg-black text-white" : ""}`}
