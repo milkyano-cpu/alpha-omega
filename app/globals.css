@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "react-phone-number-input/style.css";
 @import "../styles/phone-input.css";
+@import "../styles/payment-form.css";
 
 @plugin "tailwindcss-animate";
 

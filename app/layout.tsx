@@ -15,6 +15,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Square Web Payments SDK */}
+        <script
+          type="text/javascript"
+          src="https://sandbox.web.squarecdn.com/v1/square.js"
+        />
+      </head>
       <body
         className="antialiased"
         style={{ fontFamily: "Helvetica Neue, sans-serif" }}

@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { BookingCalendar } from "@/components/ui/calendar";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { AvailabilityResponse, BookingService, TimeSlot } from "@/lib/booking-service";
+
+// Square type definitions are added globally in types/square.d.ts
+
 
 interface Service {
   id: number;
@@ -38,21 +41,121 @@ export default function AppointmentBooking() {
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
 
+  // Square Payment SDK states
+  const [paymentForm, setPaymentForm] = useState<HTMLDivElement | null>(null);
+  const [squareCard, setSquareCard] = useState<Square.Card | null>(null);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  // Initialize Square payment form
+  useEffect(() => {
+    if (!showPaymentForm || !selectedService || !selectedTime) return;
+    
+    const initializeSquarePayment = async () => {
+      if (!window.Square) {
+        console.error('Square.js failed to load');
+        setPaymentError('Payment system failed to load. Please try again later.');
+        return;
+      }
+
+      try {
+        // Initialize Square payments with app ID and location ID from environment variables
+        const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID || 'sandbox-sq0idb-P_U19QHlNsZi7N9qLb0rAg';
+        const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || 'L87WGNMM3QSAP';
+        const payments = window.Square.payments(appId, locationId);
+        
+        // Create a card payment method
+        const card = await payments.card();
+        
+        // Attach the card payment form to the DOM
+        await card.attach('#card-container');
+        
+        // Store the card instance for later use
+        setSquareCard(card);
+      } catch (e) {
+        console.error('Error initializing Square Payment:', e);
+        setPaymentError('Failed to initialize payment form. Please try again.');
+      }
+    };
+
+    initializeSquarePayment();
+    
+    // Cleanup function
+    return () => {
+      if (squareCard) {
+        try {
+          squareCard.destroy();
+        } catch (e) {
+          console.error('Error destroying Square payment form:', e);
+        }
+      }
+    };
+  }, [showPaymentForm, selectedService, selectedTime]);
+
   // Handle payment process
-  const handlePayment = (e: React.MouseEvent) => {
-    e.preventDefault();
+  const handlePayment = async () => {
+    if (!squareCard || !selectedService) {
+      setPaymentError('Payment form not initialized properly');
+      return;
+    }
 
-    // Open payment link in a popup
-    window.open(
-      "https://square.link/u/K0DxFxCJ?src=embed",
-      "Square Payment",
-      "width=500,height=600,scrollbars=yes"
-    );
+    setProcessingPayment(true);
+    setPaymentError(null);
 
-    // Simulate successful payment after a short delay
-    setTimeout(() => {
-      setPaymentCompleted(true);
-    }, 1000);
+    try {
+      // Calculate 50% of the price
+      const depositAmount = selectedService.price_amount / 2;
+      const formattedAmount = (depositAmount / 100).toFixed(2);
+
+      // Prepare verification details
+      const verificationDetails: Square.VerificationDetails = {
+        amount: formattedAmount,
+        currencyCode: 'AUD',
+        intent: 'CHARGE' as 'CHARGE', // Type assertion to ensure it matches the expected type
+        billingContact: {
+          givenName: user?.first_name || '',
+          familyName: user?.last_name || '',
+          email: user?.email || '',
+          countryCode: 'AU',
+        },
+        customerInitiated: true,
+      };
+
+      // Tokenize the payment method
+      const tokenResult = await squareCard.tokenize(verificationDetails);
+      
+      if (tokenResult.status === 'OK') {
+        // Process the payment with the token
+        const paymentResponse = await fetch('/api/process-payment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            sourceId: tokenResult.token,
+            amount: depositAmount,
+            idempotencyKey: self.crypto.randomUUID(),
+            locationId: process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || 'L87WGNMM3QSAP',
+          }),
+        });
+
+        if (paymentResponse.ok) {
+          // Payment successful
+          setPaymentCompleted(true);
+          setProcessingPayment(false);
+        } else {
+          const errorData = await paymentResponse.json();
+          throw new Error(errorData.message || 'Payment processing failed');
+        }
+      } else {
+        throw new Error(`Tokenization failed: ${tokenResult.errors?.[0]?.message || tokenResult.status}`);
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      setPaymentError(error instanceof Error ? error.message : 'Payment processing failed');
+      setProcessingPayment(false);
+    }
   };
 
   // Load selected service from localStorage
@@ -237,6 +340,15 @@ export default function AppointmentBooking() {
     setSelectedTime(time);
   };
 
+  // Show payment form
+  const handleShowPaymentForm = () => {
+    if (!selectedService || !selectedTime || !user) {
+      setError("Please select a service and time first");
+      return;
+    }
+    setShowPaymentForm(true);
+  };
+
   // Function to handle booking confirmation after payment
   const handleBookingConfirmation = async () => {
     if (!selectedService || !selectedTime || !user || !paymentCompleted) {
@@ -256,12 +368,16 @@ export default function AppointmentBooking() {
         serviceVariationVersion
       );
 
+      // Add customer note indicating 50% deposit was paid
+      const customerNote = "50% deposit paid via Square payment. Remaining balance to be paid at appointment.";
+
       // Use BookingService to create booking
       const bookingData = await BookingService.createBooking({
         service_variation_id: selectedService.service_variation_id,
         team_member_id: selectedService.team_member_id.toString(),
         start_at: selectedTime.start_at,
         service_variation_version: serviceVariationVersion,
+        customer_note: customerNote
       });
 
       console.log("Booking created:", bookingData);
@@ -270,11 +386,22 @@ export default function AppointmentBooking() {
       setBookingConfirmed(true);
       if (bookingData?.data?.id) {
         setBookingId(bookingData.data.id.toString());
+
+        // Save booking details to localStorage for reference on thank you page
+        localStorage.setItem("lastBooking", JSON.stringify({
+          id: bookingData.data.id,
+          service: selectedService.name,
+          date: new Date(selectedTime.start_at).toLocaleDateString(),
+          time: new Date(selectedTime.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          deposit: ((selectedService.price_amount / 2) / 100).toFixed(2),
+          total: (selectedService.price_amount / 100).toFixed(2),
+          status: bookingData.data.status || "confirmed"
+        }));
       }
 
       // After a brief delay, redirect to thank you page
       setTimeout(() => {
-        // Clear localStorage
+        // Clear selection data from localStorage
         localStorage.removeItem("selectedService");
         localStorage.removeItem("selectedBarberId");
 
@@ -385,28 +512,100 @@ export default function AppointmentBooking() {
     }
 
     if (selectedTime) {
-      return (
-        <div className="rounded-lg overflow-hidden border border-gray-200">
-          <p className="p-3 font-medium text-base border-b border-gray-100 bg-gray-50">
-            Payment
-          </p>
-          <div className="p-5">
-            <p className="text-xl font-medium mb-4">
-              $
-              {selectedService
-                ? (selectedService.price_amount / 100).toFixed(2)
-                : "0.00"}{" "}
-              AUD
+      if (showPaymentForm) {
+        return (
+          <div className="rounded-lg overflow-hidden border border-gray-200">
+            <p className="p-3 font-medium text-base border-b border-gray-100 bg-gray-50">
+              Payment - 50% Deposit
             </p>
-            <Button
-              className="w-full py-3 text-base bg-blue-500 hover:bg-blue-600 text-white rounded-md font-normal"
-              onClick={handlePayment}
-            >
-              Pay now
-            </Button>
+            <div className="p-5">
+              <p className="text-md mb-2">
+                Please provide your card details to pay a 50% deposit:
+              </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+                <p className="text-sm text-blue-700">
+                  <strong>Secure Payment</strong>: Your card information is processed securely by Square.
+                  The remaining balance will be collected at the barbershop.
+                </p>
+              </div>
+              <p className="text-xl font-medium mb-4">
+                $
+                {selectedService
+                  ? ((selectedService.price_amount / 2) / 100).toFixed(2)
+                  : "0.00"}{" "}
+                AUD
+              </p>
+              
+              {paymentError && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+                  {paymentError}
+                </div>
+              )}
+              
+              <div id="card-container" className="mb-5 border rounded-md p-3 min-h-[140px]"></div>
+              
+              <div className="flex flex-col space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Deposit Amount:</span>
+                  <span className="font-medium">
+                    ${selectedService ? ((selectedService.price_amount / 2) / 100).toFixed(2) : "0.00"} AUD
+                  </span>
+                </div>
+                <div className="bg-gray-50 border-t border-gray-200 pt-2 mt-1 flex items-center justify-between">
+                  <span className="font-medium">Total Payment:</span>
+                  <span className="font-bold">
+                    ${selectedService ? ((selectedService.price_amount / 2) / 100).toFixed(2) : "0.00"} AUD
+                  </span>
+                </div>
+              </div>
+              
+              <Button
+                className="w-full py-3 text-base bg-blue-500 hover:bg-blue-600 text-white rounded-md font-normal mt-4"
+                onClick={handlePayment}
+                disabled={processingPayment}
+              >
+                {processingPayment ? "Processing..." : "Pay Deposit Now"}
+              </Button>
+              
+              <p className="text-xs text-gray-500 mt-2 text-center">
+                By proceeding with payment, you agree to our <a href="#" className="underline">Terms of Service</a>
+              </p>
+              
+              <button 
+                type="button" 
+                className="w-full mt-2 text-sm text-gray-500 hover:underline"
+                onClick={() => setShowPaymentForm(false)}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
-        </div>
-      );
+        );
+      } else {
+        return (
+          <div className="rounded-lg overflow-hidden border border-gray-200">
+            <p className="p-3 font-medium text-base border-b border-gray-100 bg-gray-50">
+              Payment
+            </p>
+            <div className="p-5">
+              <p className="text-xl font-medium mb-1">
+                $
+                {selectedService
+                  ? (selectedService.price_amount / 100).toFixed(2)
+                  : "0.00"}{" "}
+                AUD
+              </p>
+              <p className="text-sm text-gray-600 mb-4">50% deposit required: ${selectedService ? ((selectedService.price_amount / 2) / 100).toFixed(2) : "0.00"} AUD</p>
+              <Button
+                className="w-full py-3 text-base bg-blue-500 hover:bg-blue-600 text-white rounded-md font-normal"
+                onClick={handleShowPaymentForm}
+              >
+                Proceed to Payment
+              </Button>
+            </div>
+          </div>
+        );
+      }
     }
 
     return null;

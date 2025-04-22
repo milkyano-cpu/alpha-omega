@@ -1,13 +1,24 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 
+interface BookingDetails {
+  id: number;
+  service: string;
+  date: string;
+  time: string;
+  deposit: string;
+  total: string;
+  status: string;
+}
+
 export default function ThankYou() {
   const router = useRouter();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const [bookingDetails, setBookingDetails] = useState<BookingDetails | null>(null);
 
   useEffect(() => {
     // Check if user is authenticated
@@ -16,8 +27,22 @@ export default function ThankYou() {
       return;
     }
 
-    // In a real application, you might fetch the latest booking from the API
-    // For now, we'll just show a generic thank you message
+    // Get the booking details from localStorage
+    const lastBookingStr = localStorage.getItem("lastBooking");
+    if (lastBookingStr) {
+      try {
+        const lastBooking = JSON.parse(lastBookingStr) as BookingDetails;
+        setBookingDetails(lastBooking);
+      } catch (err) {
+        console.error("Error parsing booking details:", err);
+      }
+    }
+
+    // Clear the booking details after we've loaded them
+    // to prevent showing old booking details on page refresh
+    return () => {
+      localStorage.removeItem("lastBooking");
+    };
   }, [isAuthenticated, router]);
 
   return (
@@ -44,13 +69,44 @@ export default function ThankYou() {
           <h1 className="text-3xl font-bold mb-4">Booking Confirmed!</h1>
 
           <p className="text-lg mb-6">
-            Thank you for choosing Alpha Omega. Your appointment has been
+            Thank you for choosing Alpha Omega, {user?.first_name}. Your appointment has been
             successfully booked!
           </p>
+
+          {bookingDetails && (
+            <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200 text-left">
+              <h2 className="font-bold text-xl mb-2 text-center">Booking Details</h2>
+              
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <p className="text-gray-600">Service:</p>
+                <p className="font-medium">{bookingDetails.service}</p>
+                
+                <p className="text-gray-600">Date:</p>
+                <p className="font-medium">{bookingDetails.date}</p>
+                
+                <p className="text-gray-600">Time:</p>
+                <p className="font-medium">{bookingDetails.time}</p>
+                
+                <p className="text-gray-600">Deposit Paid:</p>
+                <p className="font-medium">${bookingDetails.deposit} AUD</p>
+                
+                <p className="text-gray-600">Total Price:</p>
+                <p className="font-medium">${bookingDetails.total} AUD</p>
+                
+                <p className="text-gray-600">Balance Due:</p>
+                <p className="font-medium">${(parseFloat(bookingDetails.total) - parseFloat(bookingDetails.deposit)).toFixed(2)} AUD</p>
+                
+                <p className="text-gray-600">Booking Status:</p>
+                <p className="font-medium capitalize">{bookingDetails.status}</p>
+              </div>
+            </div>
+          )}
 
           <p className="mb-8 text-gray-600">
             You will receive a confirmation email with the details of your
             appointment. Please arrive 10 minutes before your scheduled time.
+            <br/><br/>
+            <strong>Remember:</strong> Please pay the remaining balance at the barbershop.
           </p>
 
           <div className="flex flex-col gap-4">
