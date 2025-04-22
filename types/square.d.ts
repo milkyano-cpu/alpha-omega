@@ -18,7 +18,7 @@ declare namespace Square {
   interface VerificationDetails {
     amount: string;
     currencyCode: string;
-    intent: 'CHARGE' | 'STORE';
+    intent: 'CHARGE' | 'STORE' | string; // Allow string type for flexibility
     billingContact?: {
       givenName?: string;
       familyName?: string;

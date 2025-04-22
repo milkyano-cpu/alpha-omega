@@ -3,8 +3,8 @@ import { Client, Environment } from 'square';
 
 // Square client configuration
 const square = new Client({
-  environment: process.env.NODE_ENV === 'production' ? Environment.Production : Environment.Sandbox,
-  accessToken: process.env.SQUARE_ACCESS_TOKEN || 'sandbox-sq0atb-T33zq3_zCL8e68T0CqTptA',
+  environment: Environment.Sandbox,
+  accessToken: process.env.SQUARE_ACCESS_TOKEN || '',
 });
 
 export async function POST(request: NextRequest) {
@@ -43,6 +43,25 @@ export async function POST(request: NextRequest) {
       paymentRequest.verificationToken = customerDetails.verificationToken;
     }
 
+    // Add buyer details to the payment
+    if (customerDetails) {
+      paymentRequest.buyerEmailAddress = customerDetails.email;
+      paymentRequest.buyerPhoneNumber = customerDetails.phoneNumber;
+
+      // Add billing details if available
+      if (customerDetails.firstName && customerDetails.lastName) {
+        paymentRequest.billingAddress = {
+          firstName: customerDetails.firstName,
+          lastName: customerDetails.lastName,
+          countryCode: 'AU', // Default to Australia
+        };
+      }
+    }
+
+    console.log('Payment request:', JSON.stringify(paymentRequest, (key, value) => 
+      typeof value === 'bigint' ? value.toString() : value
+    ));
+
     const response = await square.paymentsApi.createPayment(paymentRequest);
 
     // Return success response with payment details
@@ -54,16 +73,27 @@ export async function POST(request: NextRequest) {
         receiptUrl: response.result.payment?.receiptUrl,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Payment processing error:', error);
+    
+    // Log detailed error information for debugging
+    if (error && error.response) {
+      console.error('Square API response error:', error.response.status, error.response.data);
+    } else if (error && error.request) {
+      console.error('No response received from Square API');
+    }
     
     // Format Square API errors if available
     let errorMessage = 'Payment processing failed';
     let errorDetails = null;
     
-    if (error.errors && Array.isArray(error.errors)) {
+    if (error && error.errors && Array.isArray(error.errors)) {
       errorDetails = error.errors;
       errorMessage = error.errors[0]?.detail || errorMessage;
+      // Log individual errors for debugging
+      error.errors.forEach((err: any, index: number) => {
+        console.error(`Square error ${index + 1}:`, err);
+      });
     }
     
     return NextResponse.json(

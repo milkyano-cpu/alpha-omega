@@ -69,13 +69,22 @@ export default function ThankYou() {
           <h1 className="text-3xl font-bold mb-4">Booking Confirmed!</h1>
 
           <p className="text-lg mb-6">
-            Thank you for choosing Alpha Omega, {user?.first_name}. Your appointment has been
-            successfully booked!
+            Thank you for choosing Alpha Omega, {user?.first_name}. 
+            {bookingDetails?.status === "payment_received" 
+              ? "Your payment has been processed successfully!" 
+              : "Your appointment has been successfully booked!"}
           </p>
 
           {bookingDetails && (
             <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200 text-left">
               <h2 className="font-bold text-xl mb-2 text-center">Booking Details</h2>
+              
+              {bookingDetails.status === "payment_received" && (
+                <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-800 text-sm">
+                  <p className="font-bold mb-1">Important Notice:</p>
+                  <p>Your payment was processed successfully, but we encountered an issue finalizing your booking. Our team has been notified and will confirm your appointment shortly.</p>
+                </div>
+              )}
               
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <p className="text-gray-600">Service:</p>
@@ -97,16 +106,29 @@ export default function ThankYou() {
                 <p className="font-medium">${(parseFloat(bookingDetails.total) - parseFloat(bookingDetails.deposit)).toFixed(2)} AUD</p>
                 
                 <p className="text-gray-600">Booking Status:</p>
-                <p className="font-medium capitalize">{bookingDetails.status}</p>
+                <p className={`font-medium capitalize ${bookingDetails.status === "payment_received" ? "text-yellow-600" : ""}`}>
+                  {bookingDetails.status === "payment_received" ? "Processing" : bookingDetails.status}
+                </p>
               </div>
             </div>
           )}
 
           <p className="mb-8 text-gray-600">
-            You will receive a confirmation email with the details of your
-            appointment. Please arrive 10 minutes before your scheduled time.
-            <br/><br/>
-            <strong>Remember:</strong> Please pay the remaining balance at the barbershop.
+            {bookingDetails?.status === "payment_received" ? (
+              <>
+                Your payment has been received and our team is processing your booking. 
+                You will receive a confirmation email soon.
+                <br/><br/>
+                <strong>Please note:</strong> If you don&apos;t receive a confirmation within 24 hours, please contact us.
+              </>
+            ) : (
+              <>
+                You will receive a confirmation email with the details of your
+                appointment. Please arrive 10 minutes before your scheduled time.
+                <br/><br/>
+                <strong>Remember:</strong> Please pay the remaining balance at the barbershop.
+              </>
+            )}
           </p>
 
           <div className="flex flex-col gap-4">

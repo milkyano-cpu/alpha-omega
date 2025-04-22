@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-sync-scripts */
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -19,7 +20,7 @@ export default function RootLayout({
         {/* Square Web Payments SDK */}
         <script
           type="text/javascript"
-          src="https://sandbox.web.squarecdn.com/v1/square.js"
+          src="https://web.squarecdn.com/v1/square.js"
         />
       </head>
       <body
