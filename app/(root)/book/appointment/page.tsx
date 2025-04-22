@@ -68,15 +68,17 @@ export default function AppointmentBooking() {
 
       try {
         // Initialize Square payments with app ID and location ID from environment variables
-        const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID || '';
-        const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || '';
-        
+        const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID || "";
+        const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || "";
+
         if (!appId || !locationId) {
-          console.error('Missing Square credentials in environment variables');
-          setPaymentError('Payment system configuration error. Please contact support.');
+          console.error("Missing Square credentials in environment variables");
+          setPaymentError(
+            "Payment system configuration error. Please contact support."
+          );
           return;
         }
-        
+
         const payments = window.Square.payments(appId, locationId);
 
         // Create a card payment method
@@ -147,6 +149,7 @@ export default function AppointmentBooking() {
           countryCode: "AU",
         },
         customerInitiated: true,
+        sellerKeyedIn: false, // Adding the missing required field
       };
 
       // Tokenize the payment method
@@ -163,16 +166,9 @@ export default function AppointmentBooking() {
             sourceId: tokenResult.token,
             amount: depositAmount,
             idempotencyKey: self.crypto.randomUUID(),
-            locationId: process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || '',
+            locationId: process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || "",
             // Pass customer details for the payment
-            customerDetails: {
-              ...(user.square_up_id && { squareCustomerId: user.square_up_id }),
-              email: user.email,
-              firstName: user.first_name,
-              lastName: user.last_name,
-              phoneNumber: user.phone_number,
-              verificationToken: tokenResult.token,
-            },
+            ...(user.square_up_id && { customer_id: user.square_up_id }),
           }),
         });
 
@@ -185,6 +181,7 @@ export default function AppointmentBooking() {
           throw new Error(errorData.message || "Payment processing failed");
         }
       } else {
+        console.log("tokenResult.errors", tokenResult);
         throw new Error(
           `Tokenization failed: ${
             tokenResult.errors?.[0]?.detail || tokenResult.status

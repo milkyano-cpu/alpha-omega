@@ -1,21 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { Client, Environment } from 'square';
+import { NextRequest, NextResponse } from "next/server";
+import { Client, Environment } from "square";
 
 // Square client configuration
 const square = new Client({
-  environment: Environment.Sandbox,
-  accessToken: process.env.SQUARE_ACCESS_TOKEN || '',
+  environment: Environment.Production,
+  accessToken: process.env.SQUARE_ACCESS_TOKEN || "",
 });
 
 export async function POST(request: NextRequest) {
   try {
     // Parse request body
     const body = await request.json();
-    const { sourceId, amount, idempotencyKey, locationId, customerDetails } = body;
-    
+    const { sourceId, amount, idempotencyKey, locationId, customerDetails } =
+      body;
+
     if (!sourceId || !amount || !idempotencyKey || !locationId) {
       return NextResponse.json(
-        { success: false, message: 'Missing required payment information' },
+        { success: false, message: "Missing required payment information" },
         { status: 400 }
       );
     }
@@ -25,12 +26,12 @@ export async function POST(request: NextRequest) {
       sourceId,
       amountMoney: {
         amount: BigInt(Math.round(amount)), // Square expects the amount in cents
-        currency: 'AUD',
+        currency: "AUD",
       },
       locationId,
       idempotencyKey,
-      note: 'Alpha Omega Barber Shop - Appointment Deposit',
-      statementDescriptionIdentifier: 'ALPHAOMEGA',
+      note: "Alpha Omega Barber Shop - Appointment Deposit",
+      statementDescriptionIdentifier: "ALPHAOMEGA",
     };
 
     // Add customer details if available
@@ -53,14 +54,17 @@ export async function POST(request: NextRequest) {
         paymentRequest.billingAddress = {
           firstName: customerDetails.firstName,
           lastName: customerDetails.lastName,
-          countryCode: 'AU', // Default to Australia
+          countryCode: "AU", // Default to Australia
         };
       }
     }
 
-    console.log('Payment request:', JSON.stringify(paymentRequest, (key, value) => 
-      typeof value === 'bigint' ? value.toString() : value
-    ));
+    console.log(
+      "Payment request:",
+      JSON.stringify(paymentRequest, (key, value) =>
+        typeof value === "bigint" ? value.toString() : value
+      )
+    );
 
     const response = await square.paymentsApi.createPayment(paymentRequest);
 
@@ -74,19 +78,23 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error: any) {
-    console.error('Payment processing error:', error);
-    
+    console.error("Payment processing error:", error);
+
     // Log detailed error information for debugging
     if (error && error.response) {
-      console.error('Square API response error:', error.response.status, error.response.data);
+      console.error(
+        "Square API response error:",
+        error.response.status,
+        error.response.data
+      );
     } else if (error && error.request) {
-      console.error('No response received from Square API');
+      console.error("No response received from Square API");
     }
-    
+
     // Format Square API errors if available
-    let errorMessage = 'Payment processing failed';
+    let errorMessage = "Payment processing failed";
     let errorDetails = null;
-    
+
     if (error && error.errors && Array.isArray(error.errors)) {
       errorDetails = error.errors;
       errorMessage = error.errors[0]?.detail || errorMessage;
@@ -95,12 +103,12 @@ export async function POST(request: NextRequest) {
         console.error(`Square error ${index + 1}:`, err);
       });
     }
-    
+
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         message: errorMessage,
-        details: errorDetails 
+        details: errorDetails,
       },
       { status: 500 }
     );
