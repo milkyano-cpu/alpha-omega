@@ -39,26 +39,6 @@ export async function POST(request: NextRequest) {
       paymentRequest.customerId = customerDetails.squareCustomerId;
     }
 
-    // If using buyer-provided verification info, include that
-    if (customerDetails?.verificationToken) {
-      paymentRequest.verificationToken = customerDetails.verificationToken;
-    }
-
-    // Add buyer details to the payment
-    if (customerDetails) {
-      paymentRequest.buyerEmailAddress = customerDetails.email;
-      paymentRequest.buyerPhoneNumber = customerDetails.phoneNumber;
-
-      // Add billing details if available
-      if (customerDetails.firstName && customerDetails.lastName) {
-        paymentRequest.billingAddress = {
-          firstName: customerDetails.firstName,
-          lastName: customerDetails.lastName,
-          countryCode: "AU", // Default to Australia
-        };
-      }
-    }
-
     console.log(
       "Payment request:",
       JSON.stringify(paymentRequest, (key, value) =>
