@@ -37,7 +37,9 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
 }) => {
   if (!selectedService || !selectedTime) return null;
 
-  const depositAmount = selectedService.price_amount / 2 / 100;
+  // The deposit amount is the actual price in Square
+  // This is 50% of the doubled price shown to customers
+  const depositAmount = selectedService.price_amount / 100;
 
   return (
     <div className="rounded-lg overflow-hidden border border-gray-200">

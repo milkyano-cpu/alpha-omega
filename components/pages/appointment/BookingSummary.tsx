@@ -33,9 +33,10 @@ export const BookingSummary: React.FC<BookingSummaryProps> = ({
 }) => {
   if (!selectedService) return null;
 
-  // Calculate deposit amount (50% of total)
-  const totalAmount = selectedService ? selectedService.price_amount / 100 : 0;
-  const depositAmount = totalAmount / 2;
+  // Display doubled price for customer, but deposit is still the actual price in Square
+  const servicePrice = selectedService ? selectedService.price_amount / 100 : 0;
+  const totalAmount = servicePrice * 2; // Display double the price
+  const depositAmount = servicePrice; // Deposit is the original price (50% of displayed doubled price)
 
   // Format time for display
   const formatTime = (isoTime: string) => {

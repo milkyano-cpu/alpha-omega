@@ -136,8 +136,8 @@ export default function AppointmentBooking() {
     setPaymentError(null);
 
     try {
-      // Calculate 50% of the price
-      const depositAmount = selectedService.price_amount / 2;
+      // Use the full price from Square as the deposit (which is 50% of displayed price)
+      const depositAmount = selectedService.price_amount;
       const formattedAmount = (depositAmount / 100).toFixed(2);
 
       // Prepare verification details
@@ -177,6 +177,13 @@ export default function AppointmentBooking() {
 
         if (paymentResponse.ok) {
           // Payment successful
+          const paymentData = await paymentResponse.json();
+          // Store payment details for booking notes
+          localStorage.setItem('paymentReceipt', JSON.stringify({
+            receiptUrl: paymentData.payment?.receiptUrl,
+            paymentId: paymentData.payment?.id
+          }));
+          
           setPaymentCompleted(true);
           setProcessingPayment(false);
           
@@ -438,9 +445,21 @@ export default function AppointmentBooking() {
         serviceVariationVersion
       );
 
-      // Add customer note indicating 50% deposit was paid
+      // Get payment receipt details from localStorage
+      let receiptInfo = '';
+      const storedReceipt = localStorage.getItem('paymentReceipt');
+      if (storedReceipt) {
+        try {
+          const receiptData = JSON.parse(storedReceipt);
+          receiptInfo = `\nPayment ID: ${receiptData.paymentId || 'N/A'}\nReceipt URL: ${receiptData.receiptUrl || 'N/A'}`;
+        } catch (e) {
+          console.error('Error parsing receipt data:', e);
+        }
+      }
+      
+      // Add customer note indicating 50% deposit was paid with receipt information
       const customerNote =
-        "50% deposit paid via Square payment. Remaining balance to be paid at appointment.";
+        `50% deposit paid via Square payment. Remaining balance to be paid at appointment.${receiptInfo}`;
 
       // Use BookingService to create booking
       const bookingData = await BookingService.createBooking({
@@ -469,8 +488,8 @@ export default function AppointmentBooking() {
               hour: "2-digit",
               minute: "2-digit",
             }),
-            deposit: (selectedService.price_amount / 2 / 100).toFixed(2),
-            total: (selectedService.price_amount / 100).toFixed(2),
+            deposit: (selectedService.price_amount / 100).toFixed(2), // Full Square price as deposit
+            total: (selectedService.price_amount / 50).toFixed(2), // Double the original price shown to customer
             status: bookingData.data.status || "confirmed",
           })
         );
@@ -478,9 +497,10 @@ export default function AppointmentBooking() {
 
       // After a brief delay, redirect to thank you page
       setTimeout(() => {
-        // Clear selection data from localStorage
+        // Clear selection data and payment receipt from localStorage
         localStorage.removeItem("selectedService");
         localStorage.removeItem("selectedBarberId");
+        localStorage.removeItem("paymentReceipt");
 
         // Redirect to confirmation page
         router.push("/book/thank-you");
@@ -501,14 +521,19 @@ export default function AppointmentBooking() {
               hour: "2-digit",
               minute: "2-digit",
             }),
-            deposit: (selectedService.price_amount / 2 / 100).toFixed(2),
-            total: (selectedService.price_amount / 100).toFixed(2),
+            deposit: (selectedService.price_amount / 100).toFixed(2), // Full Square price as deposit
+            total: (selectedService.price_amount / 50).toFixed(2), // Double the original price shown to customer
             status: "payment_received", // Indicate that payment was received but booking has issues
           })
         );
 
         // Show error for a moment, then redirect anyway
         setTimeout(() => {
+          // Clean up any sensitive data
+          localStorage.removeItem("selectedService");
+          localStorage.removeItem("selectedBarberId");
+          localStorage.removeItem("paymentReceipt");
+          
           router.push("/book/thank-you");
         }, 3000); // Reduced delay to 3 seconds for better UX
       }

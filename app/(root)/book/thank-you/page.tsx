@@ -104,6 +104,7 @@ export default function ThankYou() {
                 
                 <p className="text-gray-600">Balance Due:</p>
                 <p className="font-medium">${(parseFloat(bookingDetails.total) - parseFloat(bookingDetails.deposit)).toFixed(2)} AUD</p>
+                <p className="text-xs text-gray-500 mt-1">(Displayed prices show the full service amount. 50% deposit has been paid.)</p>
                 
                 <p className="text-gray-600">Booking Status:</p>
                 <p className={`font-medium capitalize ${bookingDetails.status === "payment_received" ? "text-yellow-600" : ""}`}>

@@ -190,7 +190,7 @@ export default function ServiceSelection() {
                                   {service.name}
                                 </h3>
                                 <p className="text-gray-300 text-sm">
-                                  ${(service.price_amount / 100).toFixed(0)} +
+                                  ${(service.price_amount / 50).toFixed(0)} +
                                   [15% Surcharge On Sundays]
                                 </p>
                               </div>
