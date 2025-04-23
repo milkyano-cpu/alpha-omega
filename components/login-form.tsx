@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -41,15 +41,7 @@ export function LoginForm({
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [returnUrl, setReturnUrl] = useState<string | null>(null);
-
-  // Extract returnUrl from query parameters
-  useEffect(() => {
-    const returnUrlParam = searchParams.get('returnUrl');
-    if (returnUrlParam) {
-      setReturnUrl(returnUrlParam);
-    }
-  }, [searchParams]);
+  const returnUrl = searchParams?.get('returnUrl') || null;
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
