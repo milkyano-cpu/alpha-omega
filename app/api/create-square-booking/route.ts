@@ -12,24 +12,30 @@ const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1000;
 
 // Helper function to add delay between retries
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function POST(request: NextRequest) {
   try {
     // Parse request body
     const body = await request.json();
-    const { 
-      serviceVariationId, 
-      teamMemberId, 
-      customerId, 
-      startAt, 
+    const {
+      serviceVariationId,
+      teamMemberId,
+      customerId,
+      startAt,
       serviceVariationVersion,
       customerNote,
       idempotencyKey,
-      locationId
+      locationId,
     } = body;
 
-    if (!serviceVariationId || !teamMemberId || !startAt || !idempotencyKey || !locationId) {
+    if (
+      !serviceVariationId ||
+      !teamMemberId ||
+      !startAt ||
+      !idempotencyKey ||
+      !locationId
+    ) {
       return NextResponse.json(
         { success: false, message: "Missing required booking information" },
         { status: 400 }
@@ -37,8 +43,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine duration in minutes from service variation version data or use default
-    let durationMinutes = 30; // Default duration
-    
+    const durationMinutes = 30; // Default duration
+
     // Prepare Square booking request
     const bookingRequest = {
       idempotencyKey,
@@ -52,29 +58,33 @@ export async function POST(request: NextRequest) {
             serviceVariationId,
             teamMemberId,
             durationMinutes,
-            serviceVariationVersion: serviceVariationVersion ? BigInt(serviceVariationVersion) : undefined,
+            serviceVariationVersion: serviceVariationVersion
+              ? BigInt(serviceVariationVersion)
+              : undefined,
           },
         ],
       },
     };
 
     // Log the booking request (redact sensitive information)
-    console.log("Square booking request:", 
-      JSON.stringify({
-        ...bookingRequest,
-        booking: {
-          ...bookingRequest.booking,
-          customerId: customerId ? '[REDACTED]' : undefined,
-        }
-      }, (key, value) => 
-        typeof value === 'bigint' ? value.toString() : value
+    console.log(
+      "Square booking request:",
+      JSON.stringify(
+        {
+          ...bookingRequest,
+          booking: {
+            ...bookingRequest.booking,
+            customerId: customerId ? "[REDACTED]" : undefined,
+          },
+        },
+        (key, value) => (typeof value === "bigint" ? value.toString() : value)
       )
     );
-    
+
     // Implement retry logic
     let lastError = null;
     let bookingResult = null;
-    
+
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         const response = await square.bookingsApi.createBooking(bookingRequest);
@@ -83,14 +93,18 @@ export async function POST(request: NextRequest) {
       } catch (error: any) {
         lastError = error;
         console.error(`Booking creation attempt ${attempt} failed:`, error);
-        
+
         // Only retry if not the last attempt
         if (attempt < MAX_RETRIES) {
           // Add progressive delay between retries
           await delay(RETRY_DELAY_MS * attempt);
-          
+
           // If the error is due to idempotency key collision, just return success
-          if (error?.errors?.some((err: any) => err.code === 'IDEMPOTENCY_KEY_ALREADY_USED')) {
+          if (
+            error?.errors?.some(
+              (err: any) => err.code === "IDEMPOTENCY_KEY_ALREADY_USED"
+            )
+          ) {
             return NextResponse.json({
               success: true,
               message: "Booking already exists with this idempotency key",
@@ -101,7 +115,7 @@ export async function POST(request: NextRequest) {
         }
       }
     }
-    
+
     // If all retries failed, throw the last error
     if (!bookingResult) {
       throw lastError || new Error("All booking creation attempts failed");
@@ -136,10 +150,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({
-      success: false,
-      message: errorMessage,
-      details: errorDetails,
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        message: errorMessage,
+        details: errorDetails,
+      },
+      { status: 500 }
+    );
   }
 }

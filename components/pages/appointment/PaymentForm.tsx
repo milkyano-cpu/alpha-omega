@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { TimeSlot } from "@/lib/booking-service";
+import React from "react";
 
 interface Service {
   id: number;
@@ -52,9 +52,9 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
         </p>
         <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
           <p className="text-sm text-blue-700">
-            <strong>Secure Payment</strong>: Your card information is
-            processed securely by Square. The remaining balance will be
-            collected at the barbershop.
+            <strong>Secure Payment</strong>: Your card information is processed
+            securely by Square. The remaining balance will be collected at the
+            barbershop.
           </p>
         </div>
         <p className="text-xl font-medium mb-4">
@@ -75,15 +75,11 @@ export const PaymentForm: React.FC<PaymentFormProps> = ({
         <div className="flex flex-col space-y-3">
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600">Deposit Amount:</span>
-            <span className="font-medium">
-              ${depositAmount.toFixed(2)} AUD
-            </span>
+            <span className="font-medium">${depositAmount.toFixed(2)} AUD</span>
           </div>
           <div className="bg-gray-50 border-t border-gray-200 pt-2 mt-1 flex items-center justify-between">
             <span className="font-medium">Total Payment:</span>
-            <span className="font-bold">
-              ${depositAmount.toFixed(2)} AUD
-            </span>
+            <span className="font-bold">${depositAmount.toFixed(2)} AUD</span>
           </div>
         </div>
 

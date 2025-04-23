@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { BookingCalendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
-import { AvailabilityResponse, TimeSlot } from "@/lib/booking-service";
+import { BookingCalendar } from "@/components/ui/calendar";
+import { TimeSlot } from "@/lib/booking-service";
+import React from "react";
 
 interface DateTimeSelectorProps {
   selectedDate: Date;
