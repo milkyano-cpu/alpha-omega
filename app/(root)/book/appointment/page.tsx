@@ -42,11 +42,11 @@ export default function AppointmentBooking() {
     Record<string, AvailabilityResponse>
   >({});
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [, setCreating] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [selectedTime, setSelectedTime] = useState<TimeSlot | null>(null);
   const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
-  const [, setBookingId] = useState<string | null>(null);
+  const [squareBookingId, setSquareBookingId] = useState<string | null>(null);
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
 
@@ -136,9 +136,13 @@ export default function AppointmentBooking() {
     setPaymentError(null);
 
     try {
-      // Use the full price from Square as the deposit (which is 50% of displayed price)
-      const depositAmount = selectedService.price_amount;
+      // Calculate 50% of the price for deposit
+      const depositAmount = selectedService.price_amount / 2;
       const formattedAmount = (depositAmount / 100).toFixed(2);
+
+      // Create a unique idempotency key for this transaction
+      // This will be used for both payment and booking to ensure consistency
+      const idempotencyKey = crypto.randomUUID();
 
       // Prepare verification details
       const verificationDetails = {
@@ -168,27 +172,34 @@ export default function AppointmentBooking() {
           body: JSON.stringify({
             sourceId: tokenResult.token,
             amount: depositAmount,
-            idempotencyKey: self.crypto.randomUUID(),
+            idempotencyKey: idempotencyKey,
             locationId: process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || "",
             // Pass customer details for the payment
-            ...(user.square_up_id && { customer_id: user.square_up_id }),
+            customerDetails: {
+              squareCustomerId: user.square_up_id,
+            },
           }),
         });
 
         if (paymentResponse.ok) {
           // Payment successful
           const paymentData = await paymentResponse.json();
-          // Store payment details for booking notes
-          localStorage.setItem('paymentReceipt', JSON.stringify({
+          
+          // Store payment details for booking notes and receipt
+          const paymentInfo = {
             receiptUrl: paymentData.payment?.receiptUrl,
-            paymentId: paymentData.payment?.id
-          }));
+            paymentId: paymentData.payment?.id,
+            amount: formattedAmount,
+            currency: "AUD",
+            idempotencyKey: idempotencyKey,
+          };
+          
+          localStorage.setItem('paymentReceipt', JSON.stringify(paymentInfo));
           
           setPaymentCompleted(true);
-          setProcessingPayment(false);
           
-          // Automatically create booking after successful payment
-          await handleBookingConfirmation();
+          // Immediately create the booking in Square after successful payment
+          await createBookingInSquare(idempotencyKey, paymentInfo);
         } else {
           const errorData = await paymentResponse.json();
           throw new Error(errorData.message || "Payment processing failed");
@@ -207,6 +218,149 @@ export default function AppointmentBooking() {
         error instanceof Error ? error.message : "Payment processing failed"
       );
       setProcessingPayment(false);
+    }
+  };
+
+  // Create booking in Square directly after payment
+  const createBookingInSquare = async (idempotencyKey: string, paymentInfo: any) => {
+    if (!selectedService || !selectedTime || !user) {
+      console.error("Missing required booking information");
+      setError("Missing required booking information for booking");
+      setProcessingPayment(false);
+      return;
+    }
+
+    try {
+      // Get service variation version from the appointment segments
+      const serviceVariationVersion =
+        selectedTime.appointment_segments?.[0]?.service_variation_version;
+      
+      // Create customer note with payment details
+      const customerNote = 
+        `50% deposit of ${paymentInfo.amount} ${paymentInfo.currency} paid via Square payment (ID: ${paymentInfo.paymentId}).\n` +
+        `Receipt: ${paymentInfo.receiptUrl || 'Not available'}\n` +
+        `Remaining balance to be paid at appointment.`;
+      
+      // Create booking directly in Square
+      const squareResponse = await BookingService.createSquareBooking({
+        serviceVariationId: selectedService.service_variation_id,
+        teamMemberId: selectedTime.appointment_segments?.[0]?.team_member_id || selectedService.team_member_id,
+        customerId: user.square_up_id,
+        startAt: selectedTime.start_at,
+        serviceVariationVersion,
+        customerNote,
+        idempotencyKey,
+        locationId: selectedTime.location_id || process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || '',
+      });
+      
+      // Store the Square booking ID to use in backend sync
+      if (squareResponse.booking?.id) {
+        setSquareBookingId(squareResponse.booking.id);
+        
+        // Update payment receipt with booking ID
+        const receiptData = JSON.parse(localStorage.getItem('paymentReceipt') || '{}');
+        localStorage.setItem('paymentReceipt', JSON.stringify({
+          ...receiptData,
+          squareBookingId: squareResponse.booking.id
+        }));
+        
+        // Attempt to sync with our backend - but don't wait for it
+        syncWithBackend(idempotencyKey, squareResponse.booking.id, customerNote);
+        
+        // Mark booking as confirmed and handle UI transitions
+        setBookingConfirmed(true);
+        setProcessingPayment(false);
+        
+        // Save booking details for thank you page
+        saveBookingDetails(squareResponse);
+      }
+    } catch (error: any) {
+      console.error("Error creating Square booking:", error);
+      
+      // Don't show error to user - we'll still try to sync with backend
+      // This ensures smoother user experience even if there are issues
+      setProcessingPayment(false);
+      
+      // Try backend sync anyway - it might use a different approach
+      syncWithBackend(idempotencyKey);
+    }
+  };
+  
+  // Sync booking with our backend system - don't block user flow on this
+  const syncWithBackend = async (idempotencyKey: string, squareBookingId?: string, customerNote?: string) => {
+    if (!selectedService || !selectedTime || !user) return;
+    
+    try {
+      // If we have a Square booking ID, sync it with our backend
+      // But don't wait for response or block UI flow
+      BookingService.syncBookingWithBackend(
+        {
+          service_variation_id: selectedService.service_variation_id,
+          team_member_id: selectedService.team_member_id.toString(),
+          start_at: selectedTime.start_at,
+          service_variation_version: selectedTime.appointment_segments?.[0]?.service_variation_version,
+          customer_note: customerNote,
+          idempotencyKey,
+        },
+        squareBookingId
+      ).then(response => {
+        // Handle successful backend sync
+        if (response?.data?.id) {
+          // Update the booking ID in localStorage
+          const bookingData = JSON.parse(localStorage.getItem('lastBooking') || '{}');
+          localStorage.setItem('lastBooking', JSON.stringify({
+            ...bookingData,
+            id: response.data.id,
+            square_booking_id: response.data.square_booking_id,
+            backend_synced: true
+          }));
+        }
+      }).catch(error => {
+        // Log error but don't disrupt user flow
+        console.error("Error syncing with backend:", error);
+      });
+      
+      // Redirect to thank you page after a short delay
+      setTimeout(() => {
+        // Clean up sensitive data
+        localStorage.removeItem("selectedService");
+        localStorage.removeItem("selectedBarberId");
+        
+        // Redirect to confirmation page
+        router.push("/book/thank-you");
+      }, 1500);
+    } catch (error) {
+      console.error("Error in backend sync:", error);
+      // Still redirect user to thank you page - Square booking is confirmed
+      setTimeout(() => router.push("/book/thank-you"), 1500);
+    }
+  };
+  
+  // Save booking details for thank you page
+  const saveBookingDetails = (squareResponse: any) => {
+    if (!selectedService || !selectedTime) return;
+    
+    try {
+      localStorage.setItem(
+        "lastBooking",
+        JSON.stringify({
+          id: squareResponse.booking?.id || "pending",
+          square_booking_id: squareResponse.booking?.id,
+          service: selectedService.name,
+          date: new Date(selectedTime.start_at).toLocaleDateString(),
+          time: new Date(selectedTime.start_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          deposit: (selectedService.price_amount / 200).toFixed(2), // 50% of the price
+          total: (selectedService.price_amount / 100).toFixed(2),
+          status: squareResponse.booking?.status || "confirmed",
+          square_confirmed: true,
+          backend_synced: false,
+        })
+      );
+    } catch (error) {
+      console.error("Error saving booking details:", error);
     }
   };
 
@@ -417,138 +571,6 @@ export default function AppointmentBooking() {
     }
     setShowPaymentForm(true);
   };
-
-  // Function to handle booking confirmation after payment
-  const handleBookingConfirmation = async () => {
-    if (!selectedService || !selectedTime || !user) {
-      setError("Missing required information for booking");
-      return;
-    }
-
-    if (!paymentCompleted) {
-      // Only validate payment if not completed yet
-      // This allows manual running for testing, but in production
-      // this function should only be called after payment is confirmed
-      setError("Payment must be completed before booking");
-      return;
-    }
-
-    setCreating(true);
-    setError(null);
-
-    try {
-      // Get service variation version from the appointment segments
-      const serviceVariationVersion =
-        selectedTime.appointment_segments?.[0]?.service_variation_version;
-      console.log(
-        "Booking with service variation version:",
-        serviceVariationVersion
-      );
-
-      // Get payment receipt details from localStorage
-      let receiptInfo = '';
-      const storedReceipt = localStorage.getItem('paymentReceipt');
-      if (storedReceipt) {
-        try {
-          const receiptData = JSON.parse(storedReceipt);
-          receiptInfo = `\nPayment ID: ${receiptData.paymentId || 'N/A'}\nReceipt URL: ${receiptData.receiptUrl || 'N/A'}`;
-        } catch (e) {
-          console.error('Error parsing receipt data:', e);
-        }
-      }
-      
-      // Add customer note indicating 50% deposit was paid with receipt information
-      const customerNote =
-        `50% deposit paid via Square payment. Remaining balance to be paid at appointment.${receiptInfo}`;
-
-      // Use BookingService to create booking
-      const bookingData = await BookingService.createBooking({
-        service_variation_id: selectedService.service_variation_id,
-        team_member_id: selectedService.team_member_id.toString(),
-        start_at: selectedTime.start_at,
-        service_variation_version: serviceVariationVersion,
-        customer_note: customerNote,
-      });
-
-      console.log("Booking created:", bookingData);
-
-      // Set booking as confirmed and store the ID
-      setBookingConfirmed(true);
-      if (bookingData?.data?.id) {
-        setBookingId(bookingData.data.id.toString());
-
-        // Save booking details to localStorage for reference on thank you page
-        localStorage.setItem(
-          "lastBooking",
-          JSON.stringify({
-            id: bookingData.data.id,
-            service: selectedService.name,
-            date: new Date(selectedTime.start_at).toLocaleDateString(),
-            time: new Date(selectedTime.start_at).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            deposit: (selectedService.price_amount / 100).toFixed(2), // Full Square price as deposit
-            total: (selectedService.price_amount / 50).toFixed(2), // Double the original price shown to customer
-            status: bookingData.data.status || "confirmed",
-          })
-        );
-      }
-
-      // After a brief delay, redirect to thank you page
-      setTimeout(() => {
-        // Clear selection data and payment receipt from localStorage
-        localStorage.removeItem("selectedService");
-        localStorage.removeItem("selectedBarberId");
-        localStorage.removeItem("paymentReceipt");
-
-        // Redirect to confirmation page
-        router.push("/book/thank-you");
-      }, 1000); // Reduced delay for better UX
-    } catch (err: any) {
-      console.error("Error creating booking:", err);
-      setError(err instanceof Error ? err.message : "Failed to create booking");
-
-      // Even if booking creation fails, we should still save basic info so user doesn't lose payment data
-      if (paymentCompleted && selectedService && selectedTime) {
-        localStorage.setItem(
-          "lastBooking",
-          JSON.stringify({
-            id: "pending", // Indicate that the booking is pending in our system
-            service: selectedService.name,
-            date: new Date(selectedTime.start_at).toLocaleDateString(),
-            time: new Date(selectedTime.start_at).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            deposit: (selectedService.price_amount / 100).toFixed(2), // Full Square price as deposit
-            total: (selectedService.price_amount / 50).toFixed(2), // Double the original price shown to customer
-            status: "payment_received", // Indicate that payment was received but booking has issues
-          })
-        );
-
-        // Show error for a moment, then redirect anyway
-        setTimeout(() => {
-          // Clean up any sensitive data
-          localStorage.removeItem("selectedService");
-          localStorage.removeItem("selectedBarberId");
-          localStorage.removeItem("paymentReceipt");
-          
-          router.push("/book/thank-you");
-        }, 3000); // Reduced delay to 3 seconds for better UX
-      }
-    } finally {
-      setCreating(false);
-    }
-  };
-
-
-
-
-
-
-
-
 
   if (!selectedService) {
     return (

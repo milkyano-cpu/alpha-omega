@@ -8,6 +8,19 @@ export interface BookingRequest {
   start_at: string;
   service_variation_version?: number;
   customer_note?: string;
+  // Optional idempotency key for Square API
+  idempotencyKey?: string;
+}
+
+export interface SquareBookingRequest {
+  serviceVariationId: string;
+  teamMemberId: string;
+  customerId?: string;
+  startAt: string;
+  serviceVariationVersion?: number;
+  customerNote?: string;
+  idempotencyKey: string;
+  locationId: string;
 }
 
 export interface TeamMember {
@@ -64,6 +77,22 @@ export interface BookingResponse {
   message: string;
 }
 
+export interface SquareBookingResponse {
+  success: boolean;
+  booking?: {
+    id: string;
+    status: string;
+    startAt: string;
+    locationId: string;
+    customerId?: string;
+    createdAt: string;
+    version: string;
+  };
+  message?: string;
+  details?: any[];
+  isRetry?: boolean;
+}
+
 export const BookingService = {
   /**
    * Get all team members (barbers)
@@ -90,24 +119,124 @@ export const BookingService = {
   },
 
   /**
-   * Create a new booking
+   * Create booking directly with Square API
+   * This is more reliable than going through our backend first
+   */
+  async createSquareBooking(bookingData: SquareBookingRequest): Promise<SquareBookingResponse> {
+    try {
+      const response = await fetch('/api/create-square-booking', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bookingData),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to create Square booking');
+      }
+      
+      return data;
+    } catch (error: any) {
+      console.error('Error creating Square booking:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Create a booking in our backend system
+   * This method won't throw errors so the user flow isn't disrupted
+   */
+  async syncBookingWithBackend(
+    bookingData: BookingRequest, 
+    squareBookingId?: string
+  ): Promise<BookingResponse | null> {
+    try {
+      // Add Square booking ID to request if available
+      const requestData = squareBookingId ? 
+        { ...bookingData, square_booking_id: squareBookingId } : 
+        bookingData;
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"}/bookings`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token") || null}`,
+        },
+        body: JSON.stringify(requestData),
+      });
+
+      const data = await response.json();
+      
+      // Even if response is not OK, we don't throw an error
+      // We just return null or the data we got
+      return response.ok ? data : null;
+    } catch (error: any) {
+      // Log error but don't throw - this ensures user flow continues
+      console.error("Error syncing booking with backend:", error);
+      return null;
+    }
+  },
+
+  /**
+   * Create a booking - handles both Square and backend creation
+   * This method remains the same from the caller's perspective for backward compatibility
    */
   async createBooking(bookingData: BookingRequest): Promise<BookingResponse> {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"}/bookings`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${localStorage.getItem("token") || null}`,
-      },
-      body: JSON.stringify(bookingData),
+    // First try to create the Square booking directly (more reliable)
+    const idempotencyKey = bookingData.idempotencyKey || crypto.randomUUID();
+
+    // Create the Square booking
+    const squareResponse = await this.createSquareBooking({
+      serviceVariationId: bookingData.service_variation_id,
+      teamMemberId: bookingData.team_member_id,
+      startAt: bookingData.start_at,
+      serviceVariationVersion: bookingData.service_variation_version,
+      customerNote: bookingData.customer_note,
+      idempotencyKey: idempotencyKey,
+      locationId: process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || '',
+      // Include customer ID if available in localStorage
+      customerId: localStorage.getItem('square_customer_id') || undefined,
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to create booking");
+    // Now, regardless of backend result, sync with our backend
+    // Use the same idempotency key to avoid duplicates
+    const backendResponse = await this.syncBookingWithBackend(
+      { 
+        ...bookingData,
+        idempotencyKey 
+      },
+      squareResponse.booking?.id
+    );
+
+    // If backend sync failed but Square booking succeeded, create a synthetic response
+    // This ensures the user flow continues smoothly
+    if (!backendResponse && squareResponse.booking) {
+      // Create a minimal response with the essential Square booking data
+      return {
+        data: {
+          id: 0, // Use 0 to indicate it's not synced with backend yet
+          square_booking_id: squareResponse.booking.id,
+          service_name: 'Your appointment', // Generic name
+          start_at: squareResponse.booking.startAt,
+          end_at: new Date(new Date(squareResponse.booking.startAt).getTime() + 3600000).toISOString(), // Add 1 hour for end time
+          status: squareResponse.booking.status || 'ACCEPTED',
+        },
+        status_code: 200,
+        message: 'Booking created in Square but not yet synced with backend',
+      };
     }
 
-    return await response.json();
+    // If we got here with a backendResponse, return it
+    // Otherwise, something really went wrong (both Square and backend failed)
+    if (backendResponse) {
+      return backendResponse;
+    }
+
+    // Both systems failed - extremely unlikely with our retry logic
+    throw new Error("Failed to create booking in both Square and backend systems");
   },
 
   /**
