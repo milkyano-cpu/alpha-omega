@@ -115,10 +115,34 @@ export function VerificationForm({
   };
 
   // Handle resend OTP code
+  const [isResending, setIsResending] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
+  const [resendError, setResendError] = useState<string | null>(null);
+
+  const { resendOtp } = useAuth();
+
   const handleResendOtp = async () => {
-    // Add your resend OTP logic here
-    // You should have an API endpoint for this
-    alert("Resend OTP functionality would go here");
+    if (!phoneNumber) {
+      setResendError("Phone number is missing. Please try again.");
+      return;
+    }
+
+    setIsResending(true);
+    setResendError(null);
+    setResendSuccess(false);
+
+    try {
+      // Call the resend OTP method from auth context
+      await resendOtp(phoneNumber);
+      
+      // Show success message
+      setResendSuccess(true);
+    } catch (err) {
+      console.error("Error resending OTP:", err);
+      setResendError(err instanceof Error ? err.message : "Failed to resend verification code");
+    } finally {
+      setIsResending(false);
+    }
   };
 
   return (
@@ -137,6 +161,18 @@ export function VerificationForm({
               {error?.includes("invalid") || error?.includes("Invalid") ? 
                 <p className="mt-1 text-xs">Please check your SMS and try again with the exact code.</p> : null
               }
+            </div>
+          )}
+
+          {resendSuccess && (
+            <div className="bg-green-100 text-green-800 text-sm p-3 rounded-md mb-4">
+              Verification code has been resent. Please check your SMS.
+            </div>
+          )}
+
+          {resendError && (
+            <div className="bg-destructive/15 text-destructive text-sm p-3 rounded-md mb-4">
+              {resendError}
             </div>
           )}
 
@@ -172,8 +208,9 @@ export function VerificationForm({
               onClick={handleResendOtp}
               className="text-primary underline underline-offset-4"
               type="button"
+              disabled={isResending}
             >
-              Resend
+              {isResending ? "Sending..." : "Resend"}
             </button>
           </p>
         </CardFooter>

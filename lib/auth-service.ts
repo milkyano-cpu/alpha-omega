@@ -36,6 +36,10 @@ export interface VerifyRequest {
   otp_code: string;
 }
 
+export interface ResendOtpRequest {
+  phone_number: string;
+}
+
 export interface AuthResponse {
   data: {
     user: User;
@@ -114,6 +118,15 @@ export const AuthService = {
       return verifyResponse;
     } catch (error: any) {
       throw new Error(error.message || "Failed to verify OTP");
+    }
+  },
+
+  async resendOtp(data: ResendOtpRequest): Promise<any> {
+    try {
+      const response = await API.post('/auth/resend-otp', data);
+      return response;
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to resend verification code");
     }
   },
 

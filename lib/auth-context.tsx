@@ -16,6 +16,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<AuthResponse>;
   register: (userData: any) => Promise<AuthResponse>;
   verify: (phoneNumber: string, otpCode: string) => Promise<VerifyResponse>;
+  resendOtp: (phoneNumber: string) => Promise<any>;
   logout: () => void;
 }
 
@@ -123,6 +124,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const resendOtp = async (phoneNumber: string) => {
+    try {
+      const response = await AuthService.resendOtp({
+        phone_number: phoneNumber,
+      });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  };
+
   const logout = () => {
     AuthService.logout();
     setUser(null);
@@ -137,6 +149,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         login,
         register,
         verify,
+        resendOtp,
         logout,
       }}
     >
