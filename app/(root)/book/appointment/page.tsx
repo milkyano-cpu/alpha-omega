@@ -8,10 +8,10 @@ import {
   BookingService,
   TimeSlot,
 } from "@/lib/booking-service";
-import { 
-  DateTimeSelector, 
-  BookingSummary, 
-  PaymentForm 
+import {
+  DateTimeSelector,
+  BookingSummary,
+  PaymentForm,
 } from "@/components/pages/appointment";
 
 // Square type definitions are added globally in types/square.d.ts
@@ -136,8 +136,9 @@ export default function AppointmentBooking() {
     setPaymentError(null);
 
     try {
-      // Calculate 50% of the price for deposit
-      const depositAmount = selectedService.price_amount / 2;
+      // The deposit amount is the actual price in Square
+      // This is 50% of the doubled price shown to customers
+      const depositAmount = selectedService.price_amount;
       const formattedAmount = (depositAmount / 100).toFixed(2);
 
       // Create a unique idempotency key for this transaction
@@ -184,7 +185,7 @@ export default function AppointmentBooking() {
         if (paymentResponse.ok) {
           // Payment successful
           const paymentData = await paymentResponse.json();
-          
+
           // Store payment details for booking notes and receipt
           const paymentInfo = {
             receiptUrl: paymentData.payment?.receiptUrl,
@@ -193,11 +194,11 @@ export default function AppointmentBooking() {
             currency: "AUD",
             idempotencyKey: idempotencyKey,
           };
-          
-          localStorage.setItem('paymentReceipt', JSON.stringify(paymentInfo));
-          
+
+          localStorage.setItem("paymentReceipt", JSON.stringify(paymentInfo));
+
           setPaymentCompleted(true);
-          
+
           // Immediately create the booking in Square after successful payment
           await createBookingInSquare(idempotencyKey, paymentInfo);
         } else {
@@ -222,7 +223,10 @@ export default function AppointmentBooking() {
   };
 
   // Create booking in Square directly after payment
-  const createBookingInSquare = async (idempotencyKey: string, paymentInfo: any) => {
+  const createBookingInSquare = async (
+    idempotencyKey: string,
+    paymentInfo: any
+  ) => {
     if (!selectedService || !selectedTime || !user) {
       console.error("Missing required booking information");
       setError("Missing required booking information for booking");
@@ -234,62 +238,80 @@ export default function AppointmentBooking() {
       // Get service variation version from the appointment segments
       const serviceVariationVersion =
         selectedTime.appointment_segments?.[0]?.service_variation_version;
-      
+
       // Create customer note with payment details
-      const customerNote = 
+      const customerNote =
         `50% deposit of ${paymentInfo.amount} ${paymentInfo.currency} paid via Square payment (ID: ${paymentInfo.paymentId}).\n` +
-        `Receipt: ${paymentInfo.receiptUrl || 'Not available'}\n` +
+        `Receipt: ${paymentInfo.receiptUrl || "Not available"}\n` +
         `Remaining balance to be paid at appointment.`;
-      
+
       // Create booking directly in Square
       const squareResponse = await BookingService.createSquareBooking({
         serviceVariationId: selectedService.service_variation_id,
-        teamMemberId: selectedTime.appointment_segments?.[0]?.team_member_id || selectedService.team_member_id,
+        teamMemberId:
+          selectedTime.appointment_segments?.[0]?.team_member_id ||
+          selectedService.team_member_id,
         customerId: user.square_up_id,
         startAt: selectedTime.start_at,
         serviceVariationVersion,
         customerNote,
         idempotencyKey,
-        locationId: selectedTime.location_id || process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || '',
+        locationId:
+          selectedTime.location_id ||
+          process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID ||
+          "",
       });
-      
+
       // Store the Square booking ID to use in backend sync
       if (squareResponse.booking?.id) {
         setSquareBookingId(squareResponse.booking.id);
-        
+
         // Update payment receipt with booking ID
-        const receiptData = JSON.parse(localStorage.getItem('paymentReceipt') || '{}');
-        localStorage.setItem('paymentReceipt', JSON.stringify({
-          ...receiptData,
-          squareBookingId: squareResponse.booking.id
-        }));
-        
+        const receiptData = JSON.parse(
+          localStorage.getItem("paymentReceipt") || "{}"
+        );
+        localStorage.setItem(
+          "paymentReceipt",
+          JSON.stringify({
+            ...receiptData,
+            squareBookingId: squareResponse.booking.id,
+          })
+        );
+
         // Attempt to sync with our backend - but don't wait for it
-        syncWithBackend(idempotencyKey, squareResponse.booking.id, customerNote);
-        
+        syncWithBackend(
+          idempotencyKey,
+          squareResponse.booking.id,
+          customerNote
+        );
+
         // Mark booking as confirmed and handle UI transitions
         setBookingConfirmed(true);
         setProcessingPayment(false);
-        
+
         // Save booking details for thank you page
         saveBookingDetails(squareResponse);
       }
     } catch (error: any) {
       console.error("Error creating Square booking:", error);
-      
+
       // Don't show error to user - we'll still try to sync with backend
       // This ensures smoother user experience even if there are issues
       setProcessingPayment(false);
-      
+
       // Try backend sync anyway - it might use a different approach
       syncWithBackend(idempotencyKey);
     }
   };
-  
+
   // Sync booking with our backend system - don't block user flow on this
-  const syncWithBackend = async (idempotencyKey: string, squareBookingId?: string, customerNote?: string) => {
+  const syncWithBackend = async (
+    idempotencyKey: string,
+    squareBookingId?: string,
+    customerNote?: string
+  ) => {
     if (!selectedService || !selectedTime || !user) return;
-    
+
     try {
       // If we have a Square booking ID, sync it with our backend
       // But don't wait for response or block UI flow
@@ -298,34 +320,42 @@ export default function AppointmentBooking() {
           service_variation_id: selectedService.service_variation_id,
           team_member_id: selectedService.team_member_id.toString(),
           start_at: selectedTime.start_at,
-          service_variation_version: selectedTime.appointment_segments?.[0]?.service_variation_version,
+          service_variation_version:
+            selectedTime.appointment_segments?.[0]?.service_variation_version,
           customer_note: customerNote,
           idempotencyKey,
         },
         squareBookingId
-      ).then(response => {
-        // Handle successful backend sync
-        if (response?.data?.id) {
-          // Update the booking ID in localStorage
-          const bookingData = JSON.parse(localStorage.getItem('lastBooking') || '{}');
-          localStorage.setItem('lastBooking', JSON.stringify({
-            ...bookingData,
-            id: response.data.id,
-            square_booking_id: response.data.square_booking_id,
-            backend_synced: true
-          }));
-        }
-      }).catch(error => {
-        // Log error but don't disrupt user flow
-        console.error("Error syncing with backend:", error);
-      });
-      
+      )
+        .then((response) => {
+          // Handle successful backend sync
+          if (response?.data?.id) {
+            // Update the booking ID in localStorage
+            const bookingData = JSON.parse(
+              localStorage.getItem("lastBooking") || "{}"
+            );
+            localStorage.setItem(
+              "lastBooking",
+              JSON.stringify({
+                ...bookingData,
+                id: response.data.id,
+                square_booking_id: response.data.square_booking_id,
+                backend_synced: true,
+              })
+            );
+          }
+        })
+        .catch((error) => {
+          // Log error but don't disrupt user flow
+          console.error("Error syncing with backend:", error);
+        });
+
       // Redirect to thank you page after a short delay
       setTimeout(() => {
         // Clean up sensitive data
         localStorage.removeItem("selectedService");
         localStorage.removeItem("selectedBarberId");
-        
+
         // Redirect to confirmation page
         router.push("/book/thank-you");
       }, 1500);
@@ -335,11 +365,11 @@ export default function AppointmentBooking() {
       setTimeout(() => router.push("/book/thank-you"), 1500);
     }
   };
-  
+
   // Save booking details for thank you page
   const saveBookingDetails = (squareResponse: any) => {
     if (!selectedService || !selectedTime) return;
-    
+
     try {
       localStorage.setItem(
         "lastBooking",
@@ -589,10 +619,19 @@ export default function AppointmentBooking() {
       return (
         <div className="p-3 bg-green-100 border border-green-300 rounded-lg mb-3 text-sm">
           <p className="text-green-800 font-medium">
-            <svg className="inline-block w-5 h-5 mr-1 -mt-1" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            <svg
+              className="inline-block w-5 h-5 mr-1 -mt-1"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clipRule="evenodd"
+              />
             </svg>
-            Booking confirmed successfully! You&apos;ll be redirected to your confirmation details.
+            Booking confirmed successfully! You&apos;ll be redirected to your
+            confirmation details.
           </p>
         </div>
       );
@@ -620,7 +659,7 @@ export default function AppointmentBooking() {
           <div className="bg-white rounded-lg shadow-sm p-4">
             <h2 className="text-base font-semibold mb-3">SUMMARY</h2>
             {renderBookingStatus()}
-            
+
             {showPaymentForm ? (
               <PaymentForm
                 squareCard={squareCard}
