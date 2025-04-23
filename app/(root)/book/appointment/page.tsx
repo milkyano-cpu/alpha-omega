@@ -358,11 +358,11 @@ export default function AppointmentBooking() {
 
         // Redirect to confirmation page
         router.push("/book/thank-you");
-      }, 1000);
+      }, 300);
     } catch (error) {
       console.error("Error in backend sync:", error);
       // Still redirect user to thank you page - Square booking is confirmed
-      setTimeout(() => router.push("/book/thank-you"), 1000);
+      setTimeout(() => router.push("/book/thank-you"), 300);
     }
   };
 

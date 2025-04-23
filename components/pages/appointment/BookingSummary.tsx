@@ -52,7 +52,7 @@ export const BookingSummary: React.FC<BookingSummaryProps> = ({
   const formatDate = (isoTime: string) => {
     const date = new Date(isoTime);
     return date.toLocaleDateString("en-US", {
-      weekday: "short",
+      weekday: "long",
       month: "short",
       day: "numeric",
     });
