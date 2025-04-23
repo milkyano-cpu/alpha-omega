@@ -42,11 +42,10 @@ export default function AppointmentBooking() {
     Record<string, AvailabilityResponse>
   >({});
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [creating, setCreating] = useState(false);
   const [selectedTime, setSelectedTime] = useState<TimeSlot | null>(null);
-  const [paymentCompleted, setPaymentCompleted] = useState(false);
+  const [, setPaymentCompleted] = useState(false);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
-  const [squareBookingId, setSquareBookingId] = useState<string | null>(null);
+  const [, setSquareBookingId] = useState<string | null>(null);
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
 
@@ -250,7 +249,7 @@ export default function AppointmentBooking() {
         serviceVariationId: selectedService.service_variation_id,
         teamMemberId:
           selectedTime.appointment_segments?.[0]?.team_member_id ||
-          selectedService.team_member_id,
+          `${selectedService.team_member_id}`,
         customerId: user.square_up_id,
         startAt: selectedTime.start_at,
         serviceVariationVersion,
@@ -358,11 +357,11 @@ export default function AppointmentBooking() {
 
         // Redirect to confirmation page
         router.push("/book/thank-you");
-      }, 300);
+      }, 500);
     } catch (error) {
       console.error("Error in backend sync:", error);
       // Still redirect user to thank you page - Square booking is confirmed
-      setTimeout(() => router.push("/book/thank-you"), 300);
+      setTimeout(() => router.push("/book/thank-you"), 500);
     }
   };
 
@@ -589,7 +588,7 @@ export default function AppointmentBooking() {
     setSelectedDate(newMonthDate);
   };
 
-  const handleTimeSelection = (time: TimeSlot) => {
+  const handleTimeSelection = (time: any) => {
     setSelectedTime(time);
   };
 
