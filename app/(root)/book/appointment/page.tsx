@@ -382,8 +382,8 @@ export default function AppointmentBooking() {
             hour: "2-digit",
             minute: "2-digit",
           }),
-          deposit: (selectedService.price_amount / 200).toFixed(2), // 50% of the price
-          total: (selectedService.price_amount / 100).toFixed(2),
+          deposit: (selectedService.price_amount / 100).toFixed(2), // 50% of the price of double amount
+          total: (selectedService.price_amount / 50).toFixed(2),
           status: squareResponse.booking?.status || "confirmed",
           square_confirmed: true,
           backend_synced: false,
