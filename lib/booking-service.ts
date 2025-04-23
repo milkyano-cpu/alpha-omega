@@ -1,4 +1,5 @@
 // lib/booking-service.ts
+import { API } from './api-client';
 
 // Define interfaces for booking-related data
 export interface BookingRequest {
@@ -63,65 +64,40 @@ export interface BookingResponse {
   message: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
-
-// Helper to get auth token
-const getToken = (): string | null => {
-  if (typeof window !== "undefined") {
-    return localStorage.getItem("token");
-  }
-  return null;
-};
-
 export const BookingService = {
   /**
    * Get all team members (barbers)
    */
   async getTeamMembers(): Promise<TeamMember[]> {
-    const response = await fetch(`${API_URL}/team-members`, {
-      headers: {
-        Authorization: `Bearer ${getToken()}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to fetch barbers");
+    try {
+      const response = await API.get('/team-members');
+      return response.data || [];
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to fetch barbers");
     }
-
-    const data = await response.json();
-    return data.data || [];
   },
 
   /**
    * Get services for a specific team member
    */
   async getTeamMemberServices(teamMemberId: number): Promise<Service[]> {
-    const response = await fetch(
-      `${API_URL}/services/team-member/${teamMemberId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${getToken()}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch services for barber ${teamMemberId}`);
+    try {
+      const response = await API.get(`/services/team-member/${teamMemberId}`);
+      return response.data || [];
+    } catch (error: any) {
+      throw new Error(error.message || `Failed to fetch services for barber ${teamMemberId}`);
     }
-
-    const data = await response.json();
-    return data.data || [];
   },
 
   /**
    * Create a new booking
    */
   async createBooking(bookingData: BookingRequest): Promise<BookingResponse> {
-    const response = await fetch(`${API_URL}/bookings`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"}/bookings`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`,
+        Authorization: `Bearer ${localStorage.getItem("token") || null}`,
       },
       body: JSON.stringify(bookingData),
     });
@@ -142,11 +118,11 @@ export const BookingService = {
     startDate: Date,
     endDate: Date
   ): Promise<AvailabilityResponse> {
-    const response = await fetch(`${API_URL}/services/availability/search`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"}/services/availability/search`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`,
+        Authorization: `Bearer ${localStorage.getItem("token") || null}`,
       },
       body: JSON.stringify({
         service_variation_id: serviceVariationId,
@@ -167,40 +143,23 @@ export const BookingService = {
    * Cancel a booking
    */
   async cancelBooking(bookingId: string): Promise<any> {
-    const response = await fetch(`${API_URL}/bookings/${bookingId}/cancel`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`,
-      },
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to cancel booking");
+    try {
+      const response = await API.post(`/bookings/${bookingId}/cancel`);
+      return response;
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to cancel booking");
     }
-
-    return await response.json();
   },
 
   /**
    * Get user's bookings
    */
   async getUserBookings(page = 1, limit = 10): Promise<any> {
-    const response = await fetch(
-      `${API_URL}/bookings?page=${page}&limit=${limit}`,
-      {
-        headers: {
-          Authorization: `Bearer ${getToken()}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to fetch bookings");
+    try {
+      const response = await API.get(`/bookings?page=${page}&limit=${limit}`);
+      return response;
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to fetch bookings");
     }
-
-    return await response.json();
   },
 };

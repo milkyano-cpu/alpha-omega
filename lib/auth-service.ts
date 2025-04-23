@@ -1,4 +1,5 @@
 // lib/auth-service.ts
+import { API } from './api-client';
 
 export interface User {
   id: number;
@@ -57,97 +58,63 @@ console.log("API_URL", API_URL);
 
 export const AuthService = {
   async register(data: RegisterRequest): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/register`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to register");
+    try {
+      const responseData = await API.post<AuthResponse>('/auth/register', data);
+      
+      // Store both token and user data in localStorage
+      if (responseData.data && responseData.data.token) {
+        localStorage.setItem("token", responseData.data.token);
+        localStorage.setItem("user", JSON.stringify(responseData.data.user));
+      }
+      
+      return responseData;
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to register");
     }
-
-    const responseData = await response.json();
-    
-    // Store both token and user data in localStorage
-    if (responseData.data && responseData.data.token) {
-      localStorage.setItem("token", responseData.data.token);
-      localStorage.setItem("user", JSON.stringify(responseData.data.user));
-    }
-    
-    return responseData;
   },
 
   async login(data: LoginRequest): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to login");
+    try {
+      const responseData = await API.post<AuthResponse>('/auth/login', data);
+      
+      // Store token and user data in localStorage
+      if (responseData.data && responseData.data.token) {
+        localStorage.setItem("token", responseData.data.token);
+        localStorage.setItem("user", JSON.stringify(responseData.data.user));
+      }
+      
+      return responseData;
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to login");
     }
-
-    const responseData = await response.json();
-    
-    // Store token and user data in localStorage
-    if (responseData.data && responseData.data.token) {
-      localStorage.setItem("token", responseData.data.token);
-      localStorage.setItem("user", JSON.stringify(responseData.data.user));
-    }
-    
-    return responseData;
   },
 
   async verify(data: VerifyRequest): Promise<VerifyResponse> {
-    const response = await fetch(`${API_URL}/auth/verify`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to verify OTP");
-    }
-
-    const verifyResponse = await response.json();
-    
-    // If verification was successful, we need to get user data
-    // We have to make an additional request to get user info
-    // since we don't have it from registration
-    if (verifyResponse.data === true) {
-      try {
-        // Get user data from /me endpoint
-        const userResponse = await fetch(`${API_URL}/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${this.getToken()}`
-          }
-        });
-        
-        if (userResponse.ok) {
-          const userData = await userResponse.json();
+    try {
+      const verifyResponse = await API.post<VerifyResponse>('/auth/verify', data);
+      
+      // If verification was successful, we need to get user data
+      // We have to make an additional request to get user info
+      // since we don't have it from registration
+      if (verifyResponse.data === true) {
+        try {
+          // Get user data from /me endpoint
+          const userData = await API.get('/auth/me');
+          
           // Now we can store the verified user
           if (userData.user) {
             localStorage.setItem("user", JSON.stringify(userData.user));
           }
+        } catch (error) {
+          console.error("Error fetching user data after verification:", error);
+          // We still return the verification response even if user fetch fails
         }
-      } catch (error) {
-        console.error("Error fetching user data after verification:", error);
-        // We still return the verification response even if user fetch fails
       }
+      
+      return verifyResponse;
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to verify OTP");
     }
-    
-    return verifyResponse;
   },
 
   logout(): void {

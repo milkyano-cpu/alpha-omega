@@ -20,6 +20,40 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## API Communication
+
+The application uses axios for most API communications. The API client is set up in `lib/api-client.ts` and provides:
+
+- Automatic token inclusion in requests
+- Consistent error handling
+- Type-safe response handling
+- Automatic redirection to login page when token expires
+
+For payment processing and booking-specific operations, the application uses the native fetch API to ensure compatibility with Square's payment processing system.
+
+## Authentication & Token Management
+
+The application handles authentication using JWT tokens with the following features:
+
+- Automatic token expiration detection using jwt-decode
+- User session preservation with localStorage
+- Smart redirection to login with return URL support
+- Periodic token validation to ensure session integrity
+
+## Working with the API
+
+To make API calls, import the API object from the api-client:
+
+```typescript
+import { API } from '@/lib/api-client';
+
+// GET request example
+const data = await API.get('/endpoint');
+
+// POST request example
+const response = await API.post('/endpoint', { key: 'value' });
+```
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

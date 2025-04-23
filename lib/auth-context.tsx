@@ -1,12 +1,13 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import {
   User,
   AuthService,
   AuthResponse,
   VerifyResponse,
 } from "@/lib/auth-service";
+import { isTokenExpired } from "@/lib/token-utils";
 
 interface AuthContextType {
   user: User | null;
@@ -25,6 +26,47 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return AuthService.getUser();
   });
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Function to verify token validity
+  const verifyTokenExpiration = () => {
+    if (typeof window === 'undefined') return;
+    
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setUser(null);
+      return;
+    }
+    
+    // Check if token is expired using our utility function
+    if (isTokenExpired(token)) {
+      // Clear user data and token if expired
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setUser(null);
+      
+      // Navigate to login if we're in a browser context
+      if (typeof window !== 'undefined') {
+        const currentPath = window.location.pathname;
+        if (currentPath !== '/login') {
+          const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+          window.location.href = `/login?returnUrl=${returnUrl}`;
+        }
+      }
+    }
+  };
+  
+  // Check token validity on mount
+  useEffect(() => {
+    verifyTokenExpiration();
+    setIsLoading(false);
+    
+    // Optional: periodically check token validity
+    const intervalId = setInterval(() => {
+      verifyTokenExpiration();
+    }, 5 * 60 * 1000); // Check every 5 minutes
+    
+    return () => clearInterval(intervalId);
+  }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
