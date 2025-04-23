@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { BookingCalendar } from "@/components/ui/calendar";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -10,6 +8,11 @@ import {
   BookingService,
   TimeSlot,
 } from "@/lib/booking-service";
+import { 
+  DateTimeSelector, 
+  BookingSummary, 
+  PaymentForm 
+} from "@/components/pages/appointment";
 
 // Square type definitions are added globally in types/square.d.ts
 
@@ -176,6 +179,9 @@ export default function AppointmentBooking() {
           // Payment successful
           setPaymentCompleted(true);
           setProcessingPayment(false);
+          
+          // Automatically create booking after successful payment
+          await handleBookingConfirmation();
         } else {
           const errorData = await paymentResponse.json();
           throw new Error(errorData.message || "Payment processing failed");
@@ -407,8 +413,16 @@ export default function AppointmentBooking() {
 
   // Function to handle booking confirmation after payment
   const handleBookingConfirmation = async () => {
-    if (!selectedService || !selectedTime || !user || !paymentCompleted) {
-      setError("Please complete payment first");
+    if (!selectedService || !selectedTime || !user) {
+      setError("Missing required information for booking");
+      return;
+    }
+
+    if (!paymentCompleted) {
+      // Only validate payment if not completed yet
+      // This allows manual running for testing, but in production
+      // this function should only be called after payment is confirmed
+      setError("Payment must be completed before booking");
       return;
     }
 
@@ -470,13 +484,12 @@ export default function AppointmentBooking() {
 
         // Redirect to confirmation page
         router.push("/book/thank-you");
-      }, 2000);
+      }, 1000); // Reduced delay for better UX
     } catch (err: any) {
       console.error("Error creating booking:", err);
       setError(err instanceof Error ? err.message : "Failed to create booking");
 
       // Even if booking creation fails, we should still save basic info so user doesn't lose payment data
-      // This way we can still show a confirmation page with payment info
       if (paymentCompleted && selectedService && selectedTime) {
         localStorage.setItem(
           "lastBooking",
@@ -497,320 +510,20 @@ export default function AppointmentBooking() {
         // Show error for a moment, then redirect anyway
         setTimeout(() => {
           router.push("/book/thank-you");
-        }, 5000);
+        }, 3000); // Reduced delay to 3 seconds for better UX
       }
     } finally {
       setCreating(false);
     }
   };
 
-  // Format time for display
-  const formatTime = (isoTime: string) => {
-    const time = new Date(isoTime);
-    return time.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  };
 
-  // Render booking summary section - more compact version
-  const renderBookingSummary = () => {
-    if (!selectedService) return null;
 
-    return (
-      <div className="mb-4">
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
-          <div className="p-3 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-            <p className="text-sm font-medium">{selectedService.name}</p>
-            <div className="flex gap-3 text-xs text-gray-600">
-              <span>${(selectedService.price_amount / 100).toFixed(2)}</span>
-              <span>
-                {selectedService.duration > 10000
-                  ? Math.round(selectedService.duration / 60000)
-                  : selectedService.duration}{" "}
-                min
-              </span>
-            </div>
-          </div>
-          <div className="p-3 flex justify-between items-center">
-            <p className="text-sm">Total</p>
-            <p className="font-medium">
-              ${(selectedService.price_amount / 100).toFixed(2)}
-            </p>
-          </div>
-        </div>
 
-        {selectedTime && (
-          <div className="mt-3 p-3 border border-green-500 rounded-lg bg-green-50">
-            <p className="font-medium text-sm mb-1">Selected Time:</p>
-            <div className="flex justify-between items-center">
-              <p className="text-lg font-medium">
-                {formatTime(selectedTime.start_at)}
-              </p>
-              <p className="text-base font-bold">
-                {new Date(selectedTime.start_at).toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                })}
-              </p>
-            </div>
-          </div>
-        )}
 
-        {error && (
-          <div className="mt-3 p-3 border border-red-400 bg-red-50 rounded-lg text-red-700 text-sm">
-            {error}
-          </div>
-        )}
-      </div>
-    );
-  };
 
-  // Render payment section
-  const renderPaymentSection = () => {
-    if (bookingConfirmed) {
-      return (
-        <div className="p-3 bg-green-100 border border-green-300 rounded-lg mb-3 text-sm">
-          <p className="text-green-800 font-medium">
-            Booking confirmed! You&apos;ll be redirected shortly.
-          </p>
-        </div>
-      );
-    }
 
-    if (paymentCompleted) {
-      return (
-        <div className="space-y-3">
-          <div className="p-3 bg-green-100 border border-green-300 rounded-lg text-sm">
-            <p className="text-green-800 font-medium">
-              Payment completed! Please confirm your booking.
-            </p>
-          </div>
-          <Button
-            onClick={handleBookingConfirmation}
-            disabled={creating}
-            className="w-full py-2 text-base font-medium"
-          >
-            {creating ? "Creating Booking..." : "Confirm Booking"}
-          </Button>
-        </div>
-      );
-    }
 
-    if (selectedTime) {
-      if (showPaymentForm) {
-        return (
-          <div className="rounded-lg overflow-hidden border border-gray-200">
-            <p className="p-3 font-medium text-base border-b border-gray-100 bg-gray-50">
-              Payment - 50% Deposit
-            </p>
-            <div className="p-5">
-              <p className="text-md mb-2">
-                Please provide your card details to pay a 50% deposit:
-              </p>
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
-                <p className="text-sm text-blue-700">
-                  <strong>Secure Payment</strong>: Your card information is
-                  processed securely by Square. The remaining balance will be
-                  collected at the barbershop.
-                </p>
-              </div>
-              <p className="text-xl font-medium mb-4">
-                $
-                {selectedService
-                  ? (selectedService.price_amount / 2 / 100).toFixed(2)
-                  : "0.00"}{" "}
-                AUD
-              </p>
-
-              {paymentError && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
-                  {paymentError}
-                </div>
-              )}
-
-              <div
-                id="card-container"
-                className="mb-5 border rounded-md p-3 min-h-[140px]"
-              ></div>
-
-              <div className="flex flex-col space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Deposit Amount:</span>
-                  <span className="font-medium">
-                    $
-                    {selectedService
-                      ? (selectedService.price_amount / 2 / 100).toFixed(2)
-                      : "0.00"}{" "}
-                    AUD
-                  </span>
-                </div>
-                <div className="bg-gray-50 border-t border-gray-200 pt-2 mt-1 flex items-center justify-between">
-                  <span className="font-medium">Total Payment:</span>
-                  <span className="font-bold">
-                    $
-                    {selectedService
-                      ? (selectedService.price_amount / 2 / 100).toFixed(2)
-                      : "0.00"}{" "}
-                    AUD
-                  </span>
-                </div>
-              </div>
-
-              <Button
-                className="w-full py-3 text-base bg-blue-500 hover:bg-blue-600 text-white rounded-md font-normal mt-4"
-                onClick={handlePayment}
-                disabled={processingPayment}
-              >
-                {processingPayment ? "Processing..." : "Pay Deposit Now"}
-              </Button>
-
-              <p className="text-xs text-gray-500 mt-2 text-center">
-                By proceeding with payment, you agree to our{" "}
-                <a href="#" className="underline">
-                  Terms of Service
-                </a>
-              </p>
-
-              <button
-                type="button"
-                className="w-full mt-2 text-sm text-gray-500 hover:underline"
-                onClick={() => setShowPaymentForm(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        );
-      } else {
-        return (
-          <div className="rounded-lg overflow-hidden border border-gray-200">
-            <p className="p-3 font-medium text-base border-b border-gray-100 bg-gray-50">
-              Payment
-            </p>
-            <div className="p-5">
-              <p className="text-xl font-medium mb-1">
-                $
-                {selectedService
-                  ? (selectedService.price_amount / 100).toFixed(2)
-                  : "0.00"}{" "}
-                AUD
-              </p>
-              <p className="text-sm text-gray-600 mb-4">
-                50% deposit required: $
-                {selectedService
-                  ? (selectedService.price_amount / 2 / 100).toFixed(2)
-                  : "0.00"}{" "}
-                AUD
-              </p>
-              <Button
-                className="w-full py-3 text-base bg-blue-500 hover:bg-blue-600 text-white rounded-md font-normal"
-                onClick={handleShowPaymentForm}
-              >
-                Proceed to Payment
-              </Button>
-            </div>
-          </div>
-        );
-      }
-    }
-
-    return null;
-  };
-
-  // Render available times section
-  const renderAvailableTimes = () => {
-    if (availableTimes.length === 0) {
-      return (
-        <div className="bg-gray-50 rounded-lg p-3 text-center text-sm">
-          <p>
-            No available times for the selected date. Please try another date.
-          </p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="flex flex-wrap gap-4">
-        {availableTimes.map((time, index) => (
-          <Button
-            key={index}
-            variant={
-              selectedTime?.start_at === time.start_at ? "default" : "outline"
-            }
-            className={`min-w-[100px] rounded-md py-2.5 px-4 text-sm ${
-              selectedTime?.start_at === time.start_at
-                ? "bg-black text-white"
-                : "bg-white border border-gray-200 text-gray-800 hover:bg-gray-100"
-            }`}
-            onClick={() => handleTimeSelection(time)}
-          >
-            {formatTime(time.start_at)}
-          </Button>
-        ))}
-      </div>
-    );
-  };
-
-  // Skeleton loader for calendar
-  const renderCalendarSkeleton = () => (
-    <div className="w-full mx-auto p-4 bg-white rounded-lg shadow-sm">
-      {/* Month and navigation header */}
-      <div className="flex justify-between items-center mb-3">
-        <div className="h-6 w-32 bg-gray-200 rounded animate-pulse"></div>
-        <div className="flex gap-1">
-          <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
-          <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
-        </div>
-      </div>
-
-      {/* Days of week */}
-      <div className="grid grid-cols-7 text-center gap-1 mb-2">
-        {Array(7)
-          .fill(0)
-          .map((_, i) => (
-            <div
-              key={i}
-              className="h-4 bg-gray-200 rounded animate-pulse"
-            ></div>
-          ))}
-      </div>
-
-      {/* Calendar grid - 5 weeks */}
-      {Array(5)
-        .fill(0)
-        .map((_, week) => (
-          <div key={week} className="grid grid-cols-7 gap-1 mb-1">
-            {Array(7)
-              .fill(0)
-              .map((_, day) => (
-                <div
-                  key={`${week}-${day}`}
-                  className="h-10 bg-gray-200 rounded-md animate-pulse"
-                  style={{ animationDelay: `${(week * 7 + day) * 50}ms` }}
-                ></div>
-              ))}
-          </div>
-        ))}
-    </div>
-  );
-
-  // Skeleton loader for time slots
-  const renderTimeSlotsSkeleton = () => (
-    <div className="flex flex-wrap gap-4">
-      {Array(8)
-        .fill(0)
-        .map((_, i) => (
-          <div
-            key={i}
-            className="min-w-[100px] h-10 bg-gray-200 rounded-md animate-pulse"
-            style={{ animationDelay: `${i * 100}ms` }}
-          ></div>
-        ))}
-    </div>
-  );
 
   if (!selectedService) {
     return (
@@ -823,38 +536,63 @@ export default function AppointmentBooking() {
     );
   }
 
+  // Rendering different states based on booking flow
+  const renderBookingStatus = () => {
+    if (bookingConfirmed) {
+      return (
+        <div className="p-3 bg-green-100 border border-green-300 rounded-lg mb-3 text-sm">
+          <p className="text-green-800 font-medium">
+            <svg className="inline-block w-5 h-5 mr-1 -mt-1" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            Booking confirmed successfully! You&apos;ll be redirected to your confirmation details.
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <main className="flex flex-col gap-6 mt-30 mb-16">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left column - Calendar and time selection */}
-          <div className="bg-white rounded-lg shadow-sm p-4">
-            <h2 className="text-base font-semibold mb-3">
-              Please select a date and time
-            </h2>
-            {isLoading ? (
-              renderCalendarSkeleton()
-            ) : (
-              <BookingCalendar
-                selectedDate={selectedDate}
-                onChange={handleDateChange}
-                onMonthChange={handleMonthChange}
-                availableDates={availableDates}
-              />
-            )}
-
-            {/* Available times section */}
-            <div className="mt-5">
-              <h3 className="text-base font-semibold mb-3">Available Times</h3>
-              {isLoading ? renderTimeSlotsSkeleton() : renderAvailableTimes()}
-            </div>
-          </div>
+          <DateTimeSelector
+            selectedDate={selectedDate}
+            onDateChange={handleDateChange}
+            onMonthChange={handleMonthChange}
+            onTimeSelect={handleTimeSelection}
+            selectedTime={selectedTime}
+            availableTimes={availableTimes}
+            availableDates={availableDates}
+            isLoading={isLoading}
+          />
 
           {/* Right column - Booking summary and payment */}
           <div className="bg-white rounded-lg shadow-sm p-4">
             <h2 className="text-base font-semibold mb-3">SUMMARY</h2>
-            {renderBookingSummary()}
-            {renderPaymentSection()}
+            {renderBookingStatus()}
+            
+            {showPaymentForm ? (
+              <PaymentForm
+                squareCard={squareCard}
+                selectedService={selectedService}
+                selectedTime={selectedTime}
+                processingPayment={processingPayment}
+                paymentError={paymentError}
+                handlePayment={handlePayment}
+                onCancelPayment={() => setShowPaymentForm(false)}
+              />
+            ) : (
+              <BookingSummary
+                selectedService={selectedService}
+                selectedTime={selectedTime}
+                error={error}
+                onProceedToPayment={handleShowPaymentForm}
+                showPaymentForm={showPaymentForm}
+              />
+            )}
           </div>
         </div>
       </div>

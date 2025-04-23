@@ -72,7 +72,7 @@ export default function ThankYou() {
             Thank you for choosing Alpha Omega, {user?.first_name}. 
             {bookingDetails?.status === "payment_received" 
               ? "Your payment has been processed successfully!" 
-              : "Your appointment has been successfully booked!"}
+              : "Your appointment has been successfully booked and confirmed!"}
           </p>
 
           {bookingDetails && (
