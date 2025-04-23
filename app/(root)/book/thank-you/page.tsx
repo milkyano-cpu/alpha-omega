@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import Link from "next/link";
 
 interface BookingDetails {
   id: number;
@@ -15,10 +16,20 @@ interface BookingDetails {
   status: string;
 }
 
+interface PaymentReceipt {
+  receiptUrl?: string;
+  paymentId?: string;
+  amount?: string;
+  currency?: string;
+  idempotencyKey?: string;
+  squareBookingId?: string;
+}
+
 export default function ThankYou() {
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
   const [bookingDetails, setBookingDetails] = useState<BookingDetails | null>(null);
+  const [paymentReceipt, setPaymentReceipt] = useState<PaymentReceipt | null>(null);
 
   useEffect(() => {
     // Check if user is authenticated
@@ -38,10 +49,22 @@ export default function ThankYou() {
       }
     }
 
+    // Get payment receipt details
+    const paymentReceiptStr = localStorage.getItem("paymentReceipt");
+    if (paymentReceiptStr) {
+      try {
+        const receipt = JSON.parse(paymentReceiptStr) as PaymentReceipt;
+        setPaymentReceipt(receipt);
+      } catch (err) {
+        console.error("Error parsing payment receipt:", err);
+      }
+    }
+
     // Clear the booking details after we've loaded them
     // to prevent showing old booking details on page refresh
     return () => {
       localStorage.removeItem("lastBooking");
+      localStorage.removeItem("paymentReceipt");
     };
   }, [isAuthenticated, router]);
 
@@ -86,6 +109,13 @@ export default function ThankYou() {
                 </div>
               )}
               
+              {paymentReceipt && paymentReceipt.receiptUrl && (
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-blue-800 text-sm">
+                  <p className="font-bold mb-1">Payment Receipt:</p>
+                  <p>Your payment has been processed successfully. <Link href={paymentReceipt.receiptUrl} target="_blank" className="text-blue-600 underline font-medium">View Receipt</Link></p>
+                </div>
+              )}
+              
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <p className="text-gray-600">Service:</p>
                 <p className="font-medium">{bookingDetails.service}</p>
@@ -110,6 +140,13 @@ export default function ThankYou() {
                 <p className={`font-medium capitalize ${bookingDetails.status === "payment_received" ? "text-yellow-600" : ""}`}>
                   {bookingDetails.status === "payment_received" ? "Processing" : bookingDetails.status}
                 </p>
+                
+                {paymentReceipt && paymentReceipt.paymentId && (
+                  <>
+                    <p className="text-gray-600">Payment ID:</p>
+                    <p className="font-medium text-xs break-all">{paymentReceipt.paymentId}</p>
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -133,6 +170,16 @@ export default function ThankYou() {
           </p>
 
           <div className="flex flex-col gap-4">
+            {paymentReceipt && paymentReceipt.receiptUrl && (
+              <Button
+                onClick={() => window.open(paymentReceipt.receiptUrl, '_blank')}
+                variant="secondary"
+                className="w-full"
+              >
+                View Payment Receipt
+              </Button>
+            )}
+            
             <Button
               onClick={() => router.push("/book/services")}
               variant="outline"
