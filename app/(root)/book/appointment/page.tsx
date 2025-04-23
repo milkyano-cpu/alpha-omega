@@ -42,7 +42,7 @@ export default function AppointmentBooking() {
     Record<string, AvailabilityResponse>
   >({});
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [, setCreating] = useState(false);
   const [selectedTime, setSelectedTime] = useState<TimeSlot | null>(null);
   const [paymentCompleted, setPaymentCompleted] = useState(false);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
