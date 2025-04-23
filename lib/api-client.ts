@@ -55,10 +55,14 @@ apiClient.interceptors.response.use(
       redirectToLogin();
     }
     
+    // Handle different response data structures
+    const errorData = error.response?.data as any;
+    const errorMessage = errorData?.message || error.message || 'An unexpected error occurred';
+    
     // Format error response consistently
     const errorResponse = {
       status: error.response?.status || 500,
-      message: error.response?.data?.message || error.message || 'An unexpected error occurred',
+      message: errorMessage,
       data: error.response?.data || null,
     };
 

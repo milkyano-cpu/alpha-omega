@@ -131,8 +131,8 @@ export function SignUpForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Create your account</CardTitle>
-          <CardDescription>Enter your information to sign up</CardDescription>
+        <CardTitle className="text-2xl">Create your account</CardTitle>
+        <CardDescription>Enter your information to sign up</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -149,9 +149,9 @@ export function SignUpForm({
                   name="first_name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>First Name</FormLabel>
+                      <FormLabel className="text-sm font-medium">First Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="John" {...field} />
+                      <Input placeholder="John" className="h-11 px-4" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -163,9 +163,9 @@ export function SignUpForm({
                   name="last_name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Last Name</FormLabel>
+                      <FormLabel className="text-sm font-medium">Last Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="Doe" {...field} />
+                      <Input placeholder="Doe" className="h-11 px-4" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -178,9 +178,9 @@ export function SignUpForm({
                 name="nickname"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nickname (Optional)</FormLabel>
+                    <FormLabel className="text-sm font-medium">Nickname (Optional)</FormLabel>
                     <FormControl>
-                      <Input placeholder="Johnny" {...field} />
+                    <Input placeholder="Johnny" className="h-11 px-4" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -192,13 +192,14 @@ export function SignUpForm({
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel className="text-sm font-medium">Email</FormLabel>
                     <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="your.email@example.com"
-                        {...field}
-                      />
+                    <Input
+                    type="email"
+                    placeholder="your.email@example.com"
+                    className="h-11 px-4"
+                      {...field}
+                  />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -210,14 +211,15 @@ export function SignUpForm({
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel className="text-sm font-medium">Password</FormLabel>
                     <div className="relative">
-                      <FormControl>
-                        <Input
-                          type={showPassword ? "text" : "password"}
-                          placeholder="••••••••"
-                          {...field}
-                        />
+                    <FormControl>
+                    <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    className="h-11 px-4"
+                      {...field}
+                    />
                       </FormControl>
                       <button
                         type="button"
@@ -241,9 +243,9 @@ export function SignUpForm({
                 name="phone_number"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
+                    <FormLabel className="text-sm font-medium">Phone Number</FormLabel>
                     <FormControl>
-                      <div className="phone-input-container">
+                    <div className="phone-input-container">
                         <PhoneInput
                           defaultCountry="AU"
                           international
@@ -269,12 +271,13 @@ export function SignUpForm({
                 name="birthday"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Birthday</FormLabel>
+                    <FormLabel className="text-sm font-medium">Birthday</FormLabel>
                     <FormControl>
-                      <Input
-                        type="date"
-                        {...field}
-                        onChange={(e) => {
+                    <Input
+                    type="date"
+                    className="h-11 px-4"
+                    {...field}
+                    onChange={(e) => {
                           field.onChange(e.target.value);
                         }}
                       />
@@ -284,13 +287,27 @@ export function SignUpForm({
                 )}
               />
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Creating account..." : "Sign Up"}
+              <Button 
+                type="submit" 
+                className="w-full h-11 font-medium text-base bg-black hover:bg-black/90 text-white rounded-md transition-all duration-200" 
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Creating account...</span>
+                  </span>
+                ) : (
+                  "Sign Up"
+                )}
               </Button>
 
               <div className="text-center text-sm">
                 Already have an account?{" "}
-                <a href="/login" className="underline underline-offset-4">
+                <a href="/login" className="text-blue-600 font-medium underline-offset-4 hover:underline">
                   Log in
                 </a>
               </div>
@@ -298,9 +315,9 @@ export function SignUpForm({
           </Form>
         </CardContent>
       </Card>
-      <div className="text-muted-foreground *:[a]:hover:text-primary text-center text-xs text-balance *:[a]:underline *:[a]:underline-offset-4">
-        By clicking Sign Up, you agree to our <a href="#">Terms of Service</a>{" "}
-        and <a href="#">Privacy Policy</a>.
+      <div className="text-muted-foreground text-center text-xs text-balance">
+        By clicking Sign Up, you agree to our <a href="#" className="text-blue-600 hover:underline underline-offset-4">Terms of Service</a>{" "}
+        and <a href="#" className="text-blue-600 hover:underline underline-offset-4">Privacy Policy</a>.
       </div>
     </div>
   );
