@@ -218,12 +218,16 @@ export default function ThankYou() {
                   <iframe
                     width='100%'
                     height='300'
-                    frameBorder='0'
+                    frameBorder={0}
                     scrolling='no'
                     marginHeight={0}
                     marginWidth={0}
-                    src='https://maps.google.com/maps?width=100%25&amp;height=600&amp;hl=en&amp;q=55%20Portman%20St,%20Oakleigh%20VIC%203166,%20Australia+(Alpha%20Omega)&amp;t=&amp;z=13&amp;ie=UTF8&amp;iwloc=B&amp;output=embed'
-                  ></iframe>
+                    src='https://maps.google.com/maps?width=100%25&amp;height=600&amp;hl=en&amp;q=104%20Greville%20street,%20Prahran,%20+(Alpha%20Omega%20Mens%20Grooming)&amp;t=&amp;z=13&amp;ie=UTF8&amp;iwloc=B&amp;output=embed'
+                  >
+                    <a href='https://www.gps.ie/collections/personal-trackers/'>
+                      real-time gps tracker,
+                    </a>
+                  </iframe>
                 </div>
                 <p className='text-sm text-center mt-2 font-medium'>
                   55 Portman St, Oakleigh VIC 3166, Australia
