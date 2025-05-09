@@ -209,6 +209,26 @@ export default function ThankYou() {
                   </p>
                 </div>
               )}
+
+              <div className='mt-4'>
+                <h3 className='font-semibold text-lg mb-2 text-center'>
+                  Our Location
+                </h3>
+                <div style={{ width: '100%' }}>
+                  <iframe
+                    width='100%'
+                    height='300'
+                    frameBorder='0'
+                    scrolling='no'
+                    marginHeight={0}
+                    marginWidth={0}
+                    src='https://maps.google.com/maps?width=100%25&amp;height=600&amp;hl=en&amp;q=55%20Portman%20St,%20Oakleigh%20VIC%203166,%20Australia+(Alpha%20Omega)&amp;t=&amp;z=13&amp;ie=UTF8&amp;iwloc=B&amp;output=embed'
+                  ></iframe>
+                </div>
+                <p className='text-sm text-center mt-2 font-medium'>
+                  55 Portman St, Oakleigh VIC 3166, Australia
+                </p>
+              </div>
             </div>
           )}
 
