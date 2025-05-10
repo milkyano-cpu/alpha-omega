@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 import {
   AvailabilityResponse,
   BookingService,
-  TimeSlot
-} from '@/lib/booking-service';
+  TimeSlot,
+} from "@/lib/booking-service";
 import {
   DateTimeSelector,
   BookingSummary,
-  PaymentForm
-} from '@/components/pages/appointment';
+  PaymentForm,
+} from "@/components/pages/appointment";
 
 // Square type definitions are added globally in types/square.d.ts
 
@@ -61,22 +61,22 @@ export default function AppointmentBooking() {
 
     const initializeSquarePayment = async () => {
       if (!window.Square) {
-        console.error('Square.js failed to load');
+        console.error("Square.js failed to load");
         setPaymentError(
-          'Payment system failed to load. Please try again later.'
+          "Payment system failed to load. Please try again later.",
         );
         return;
       }
 
       try {
         // Initialize Square payments with app ID and location ID from environment variables
-        const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID || '';
-        const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || '';
+        const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID || "";
+        const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || "";
 
         if (!appId || !locationId) {
-          console.error('Missing Square credentials in environment variables');
+          console.error("Missing Square credentials in environment variables");
           setPaymentError(
-            'Payment system configuration error. Please contact support.'
+            "Payment system configuration error. Please contact support.",
           );
           return;
         }
@@ -87,13 +87,13 @@ export default function AppointmentBooking() {
         const card = await payments.card();
 
         // Attach the card payment form to the DOM
-        await card.attach('#card-container');
+        await card.attach("#card-container");
 
         // Store the card instance for later use
         setSquareCard(card);
       } catch (e: any) {
-        console.error('Error initializing Square Payment:', e);
-        setPaymentError('Failed to initialize payment form. Please try again.');
+        console.error("Error initializing Square Payment:", e);
+        setPaymentError("Failed to initialize payment form. Please try again.");
       }
     };
 
@@ -105,7 +105,7 @@ export default function AppointmentBooking() {
         try {
           squareCard.destroy();
         } catch (e: any) {
-          console.error('Error destroying Square payment form:', e);
+          console.error("Error destroying Square payment form:", e);
         }
       }
     };
@@ -115,19 +115,19 @@ export default function AppointmentBooking() {
   // Handle payment process
   const handlePayment = async () => {
     if (!squareCard || !selectedService) {
-      setPaymentError('Payment form not initialized properly');
+      setPaymentError("Payment form not initialized properly");
       return;
     }
 
     if (!user) {
       setPaymentError(
-        'User information is not available. Please log in again.'
+        "User information is not available. Please log in again.",
       );
       return;
     }
 
     if (!user.square_up_id) {
-      console.warn('User does not have a Square customer ID');
+      console.warn("User does not have a Square customer ID");
       // We'll continue without it, but log a warning
     }
 
@@ -147,38 +147,38 @@ export default function AppointmentBooking() {
       // Prepare verification details
       const verificationDetails = {
         amount: formattedAmount,
-        currencyCode: 'AUD',
-        intent: 'CHARGE' as const, // Use type assertion to fix TypeScript error
+        currencyCode: "AUD",
+        intent: "CHARGE" as const, // Use type assertion to fix TypeScript error
         billingContact: {
-          givenName: user.first_name || '',
-          familyName: user.last_name || '',
-          email: user.email || '',
-          countryCode: 'AU'
+          givenName: user.first_name || "",
+          familyName: user.last_name || "",
+          email: user.email || "",
+          countryCode: "AU",
         },
         customerInitiated: true,
-        sellerKeyedIn: false // Adding the missing required field
+        sellerKeyedIn: false, // Adding the missing required field
       };
 
       // Tokenize the payment method
       const tokenResult = await squareCard.tokenize(verificationDetails);
 
-      if (tokenResult.status === 'OK') {
+      if (tokenResult.status === "OK") {
         // Process the payment with the token
-        const paymentResponse = await fetch('/api/process-payment', {
-          method: 'POST',
+        const paymentResponse = await fetch("/api/process-payment", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json'
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             sourceId: tokenResult.token,
             amount: depositAmount,
             idempotencyKey: idempotencyKey,
-            locationId: process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || '',
+            locationId: process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || "",
             // Pass customer details for the payment
             customerDetails: {
-              squareCustomerId: user.square_up_id
-            }
-          })
+              squareCustomerId: user.square_up_id,
+            },
+          }),
         });
 
         if (paymentResponse.ok) {
@@ -190,11 +190,11 @@ export default function AppointmentBooking() {
             receiptUrl: paymentData.payment?.receiptUrl,
             paymentId: paymentData.payment?.id,
             amount: formattedAmount,
-            currency: 'AUD',
-            idempotencyKey: idempotencyKey
+            currency: "AUD",
+            idempotencyKey: idempotencyKey,
           };
 
-          localStorage.setItem('paymentReceipt', JSON.stringify(paymentInfo));
+          localStorage.setItem("paymentReceipt", JSON.stringify(paymentInfo));
 
           setPaymentCompleted(true);
 
@@ -202,20 +202,20 @@ export default function AppointmentBooking() {
           await createBookingInSquare(idempotencyKey, paymentInfo);
         } else {
           const errorData = await paymentResponse.json();
-          throw new Error(errorData.message || 'Payment processing failed');
+          throw new Error(errorData.message || "Payment processing failed");
         }
       } else {
-        console.log('tokenResult.errors', tokenResult);
+        console.log("tokenResult.errors", tokenResult);
         throw new Error(
           `Tokenization failed: ${
             tokenResult.errors?.[0]?.detail || tokenResult.status
-          }`
+          }`,
         );
       }
     } catch (error: any) {
-      console.error('Payment error:', error);
+      console.error("Payment error:", error);
       setPaymentError(
-        error instanceof Error ? error.message : 'Payment processing failed'
+        error instanceof Error ? error.message : "Payment processing failed",
       );
       setProcessingPayment(false);
     }
@@ -224,11 +224,11 @@ export default function AppointmentBooking() {
   // Create booking in Square directly after payment
   const createBookingInSquare = async (
     idempotencyKey: string,
-    paymentInfo: any
+    paymentInfo: any,
   ) => {
     if (!selectedService || !selectedTime || !user) {
-      console.error('Missing required booking information');
-      setError('Missing required booking information for booking');
+      console.error("Missing required booking information");
+      setError("Missing required booking information for booking");
       setProcessingPayment(false);
       return;
     }
@@ -241,7 +241,7 @@ export default function AppointmentBooking() {
       // Create customer note with payment details
       const customerNote =
         `50% deposit of ${paymentInfo.amount} ${paymentInfo.currency} paid via Square payment (ID: ${paymentInfo.paymentId}).\n` +
-        `Receipt: ${paymentInfo.receiptUrl || 'Not available'}\n` +
+        `Receipt: ${paymentInfo.receiptUrl || "Not available"}\n` +
         `Remaining balance to be paid at appointment.`;
 
       // Create booking directly in Square
@@ -258,7 +258,7 @@ export default function AppointmentBooking() {
         locationId:
           selectedTime.location_id ||
           process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID ||
-          ''
+          "",
       });
 
       // Store the Square booking ID to use in backend sync
@@ -267,21 +267,21 @@ export default function AppointmentBooking() {
 
         // Update payment receipt with booking ID
         const receiptData = JSON.parse(
-          localStorage.getItem('paymentReceipt') || '{}'
+          localStorage.getItem("paymentReceipt") || "{}",
         );
         localStorage.setItem(
-          'paymentReceipt',
+          "paymentReceipt",
           JSON.stringify({
             ...receiptData,
-            squareBookingId: squareResponse.booking.id
-          })
+            squareBookingId: squareResponse.booking.id,
+          }),
         );
 
         // Attempt to sync with our backend - but don't wait for it
         syncWithBackend(
           idempotencyKey,
           squareResponse.booking.id,
-          customerNote
+          customerNote,
         );
 
         // Mark booking as confirmed and handle UI transitions
@@ -292,7 +292,7 @@ export default function AppointmentBooking() {
         saveBookingDetails(squareResponse);
       }
     } catch (error: any) {
-      console.error('Error creating Square booking:', error);
+      console.error("Error creating Square booking:", error);
 
       // Don't show error to user - we'll still try to sync with backend
       // This ensures smoother user experience even if there are issues
@@ -307,7 +307,7 @@ export default function AppointmentBooking() {
   const syncWithBackend = async (
     idempotencyKey: string,
     squareBookingId?: string,
-    customerNote?: string
+    customerNote?: string,
   ) => {
     if (!selectedService || !selectedTime || !user) return;
 
@@ -322,46 +322,46 @@ export default function AppointmentBooking() {
           service_variation_version:
             selectedTime.appointment_segments?.[0]?.service_variation_version,
           customer_note: customerNote,
-          idempotencyKey
+          idempotencyKey,
         },
-        squareBookingId
+        squareBookingId,
       )
         .then((response) => {
           // Handle successful backend sync
           if (response?.data?.id) {
             // Update the booking ID in localStorage
             const bookingData = JSON.parse(
-              localStorage.getItem('lastBooking') || '{}'
+              localStorage.getItem("lastBooking") || "{}",
             );
             localStorage.setItem(
-              'lastBooking',
+              "lastBooking",
               JSON.stringify({
                 ...bookingData,
                 id: response.data.id,
                 square_booking_id: response.data.square_booking_id,
-                backend_synced: true
-              })
+                backend_synced: true,
+              }),
             );
           }
         })
         .catch((error) => {
           // Log error but don't disrupt user flow
-          console.error('Error syncing with backend:', error);
+          console.error("Error syncing with backend:", error);
         });
 
       // Redirect to thank you page after a short delay
       setTimeout(() => {
         // Clean up sensitive data
-        localStorage.removeItem('selectedService');
-        localStorage.removeItem('selectedBarberId');
+        localStorage.removeItem("selectedService");
+        localStorage.removeItem("selectedBarberId");
 
         // Redirect to confirmation page
-        router.push('/book/thank-you');
+        router.push("/book/thank-you");
       }, 500);
     } catch (error) {
-      console.error('Error in backend sync:', error);
+      console.error("Error in backend sync:", error);
       // Still redirect user to thank you page - Square booking is confirmed
-      setTimeout(() => router.push('/book/thank-you'), 500);
+      setTimeout(() => router.push("/book/thank-you"), 500);
     }
   };
 
@@ -371,39 +371,39 @@ export default function AppointmentBooking() {
 
     try {
       localStorage.setItem(
-        'lastBooking',
+        "lastBooking",
         JSON.stringify({
-          id: squareResponse.booking?.id || 'pending',
+          id: squareResponse.booking?.id || "pending",
           square_booking_id: squareResponse.booking?.id,
           service: selectedService.name,
           date: new Date(selectedTime.start_at).toLocaleDateString(),
           time: new Date(selectedTime.start_at).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit'
+            hour: "2-digit",
+            minute: "2-digit",
           }),
           deposit: (selectedService.price_amount / 100).toFixed(2), // 50% of the price of double amount
           total: (selectedService.price_amount / 50).toFixed(2),
-          status: squareResponse.booking?.status || 'confirmed',
+          status: squareResponse.booking?.status || "confirmed",
           square_confirmed: true,
-          backend_synced: false
-        })
+          backend_synced: false,
+        }),
       );
     } catch (error) {
-      console.error('Error saving booking details:', error);
+      console.error("Error saving booking details:", error);
     }
   };
 
   // Load selected service from localStorage
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/login?returnUrl=/book/services');
+      router.push("/login?returnUrl=/book/services");
       return;
     }
 
-    const serviceData = localStorage.getItem('selectedService');
+    const serviceData = localStorage.getItem("selectedService");
     if (!serviceData) {
       // No service selected, redirect back to services page
-      router.push('/book/services');
+      router.push("/book/services");
       return;
     }
 
@@ -411,8 +411,8 @@ export default function AppointmentBooking() {
       const parsedService = JSON.parse(serviceData) as Service;
       setSelectedService(parsedService);
     } catch (err: any) {
-      console.error('Error parsing selected service:', err);
-      router.push('/book/services');
+      console.error("Error parsing selected service:", err);
+      router.push("/book/services");
     }
   }, [isAuthenticated, router]);
 
@@ -439,13 +439,13 @@ export default function AppointmentBooking() {
         setAvailableDates(dates);
 
         // Update time slots for selected date
-        const dateKey = selectedDate.toISOString().split('T')[0];
+        const dateKey = selectedDate.toISOString().split("T")[0];
         const availabilities = cachedData.availabilities_by_date[dateKey] || [];
 
         // Sort times chronologically
         availabilities.sort(
           (a, b) =>
-            new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+            new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
         );
 
         setAvailableTimes(availabilities);
@@ -476,21 +476,21 @@ export default function AppointmentBooking() {
         console.log(
           `Fetching availability for ${cacheKey} from`,
           startDate.toISOString(),
-          'to',
-          endDate.toISOString()
+          "to",
+          endDate.toISOString(),
         );
 
         // Make a single request for the entire date range
         const response = await BookingService.searchAvailability(
           selectedService.service_variation_id,
           startDate,
-          endDate
+          endDate,
         );
 
         // Store the response in cache
         setMonthCache((prev) => ({
           ...prev,
-          [cacheKey]: response
+          [cacheKey]: response,
         }));
 
         // Update state with response data
@@ -502,20 +502,20 @@ export default function AppointmentBooking() {
         setAvailableDates(dates);
 
         // If the selected date has available times, set them
-        const dateKey = selectedDate.toISOString().split('T')[0];
+        const dateKey = selectedDate.toISOString().split("T")[0];
         const availabilities = response.availabilities_by_date[dateKey] || [];
 
         // Sort times chronologically
         availabilities.sort(
           (a, b) =>
-            new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+            new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
         );
 
         setAvailableTimes(availabilities);
       } catch (err: any) {
-        console.error('Error fetching availability:', err);
+        console.error("Error fetching availability:", err);
         setError(
-          err instanceof Error ? err.message : 'Failed to load availability'
+          err instanceof Error ? err.message : "Failed to load availability",
         );
       } finally {
         setIsLoading(false);
@@ -529,7 +529,7 @@ export default function AppointmentBooking() {
     selectedDate.getMonth(),
     selectedDate.getFullYear(),
     selectedService,
-    monthCache
+    monthCache,
   ]);
 
   // Update available times when selected date changes
@@ -537,7 +537,7 @@ export default function AppointmentBooking() {
     if (!availabilityData) return;
 
     // Get the key for the selected date
-    const dateKey = selectedDate.toISOString().split('T')[0];
+    const dateKey = selectedDate.toISOString().split("T")[0];
 
     // Get available times for this date from the existing data
     const availabilities =
@@ -545,11 +545,11 @@ export default function AppointmentBooking() {
 
     // Sort times chronologically
     availabilities.sort(
-      (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+      (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
     );
 
     console.log(
-      `Found ${availabilities.length} available slots for ${dateKey}`
+      `Found ${availabilities.length} available slots for ${dateKey}`,
     );
     setAvailableTimes(availabilities);
     setSelectedTime(null); // Reset selected time when date changes
@@ -562,7 +562,7 @@ export default function AppointmentBooking() {
 
   // Handle month changes from the calendar
   const handleMonthChange = (date: Date) => {
-    console.log('Month changed to:', date);
+    console.log("Month changed to:", date);
     // Clear any previously selected time
     setSelectedTime(null);
 
@@ -595,7 +595,7 @@ export default function AppointmentBooking() {
   // Show payment form
   const handleShowPaymentForm = () => {
     if (!selectedService || !selectedTime || !user) {
-      setError('Please select a service and time first');
+      setError("Please select a service and time first");
       return;
     }
     setShowPaymentForm(true);
@@ -603,10 +603,10 @@ export default function AppointmentBooking() {
 
   if (!selectedService) {
     return (
-      <main className='flex flex-col gap-3 mt-20'>
-        <section className='container mx-auto text-center py-16'>
-          <div className='w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto'></div>
-          <p className='mt-4'>Loading service information...</p>
+      <main className="flex flex-col gap-3 mt-20">
+        <section className="container mx-auto text-center py-16">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="mt-4">Loading service information...</p>
         </section>
       </main>
     );
@@ -616,17 +616,17 @@ export default function AppointmentBooking() {
   const renderBookingStatus = () => {
     if (bookingConfirmed) {
       return (
-        <div className='p-3 bg-green-100 border border-green-300 rounded-lg mb-3 text-sm'>
-          <p className='text-green-800 font-medium'>
+        <div className="p-3 bg-green-100 border border-green-300 rounded-lg mb-3 text-sm">
+          <p className="text-green-800 font-medium">
             <svg
-              className='inline-block w-5 h-5 mr-1 -mt-1'
-              viewBox='0 0 20 20'
-              fill='currentColor'
+              className="inline-block w-5 h-5 mr-1 -mt-1"
+              viewBox="0 0 20 20"
+              fill="currentColor"
             >
               <path
-                fillRule='evenodd'
-                d='M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z'
-                clipRule='evenodd'
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                clipRule="evenodd"
               />
             </svg>
             Booking confirmed successfully! You&apos;ll be redirected to your
@@ -639,9 +639,9 @@ export default function AppointmentBooking() {
   };
 
   return (
-    <main className='flex flex-col gap-6 mt-30 mb-16'>
-      <div className='container mx-auto px-4'>
-        <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+    <main className="flex flex-col gap-6 mt-30 mb-16">
+      <div className="container mx-auto px-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left column - Calendar and time selection */}
           <DateTimeSelector
             selectedDate={selectedDate}
@@ -655,8 +655,8 @@ export default function AppointmentBooking() {
           />
 
           {/* Right column - Booking summary and payment */}
-          <div className='bg-white rounded-lg shadow-sm p-4'>
-            <h2 className='text-base font-semibold mb-3'>SUMMARY</h2>
+          <div className="bg-white rounded-lg shadow-sm p-4">
+            <h2 className="text-base font-semibold mb-3">SUMMARY</h2>
             {renderBookingStatus()}
 
             {showPaymentForm ? (

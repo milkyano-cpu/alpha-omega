@@ -63,7 +63,7 @@ export function Navbar() {
           </svg>
         </Link>
 
-        <Menu />
+        {/* <Menu /> */}
       </div>
     </nav>
   );

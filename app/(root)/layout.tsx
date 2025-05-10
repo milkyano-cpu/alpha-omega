@@ -11,11 +11,9 @@ export default function RootLayout({
     <>
       <Navbar />
       <div className="pt-8">
-        <VerificationRequired>
-          {children}
-        </VerificationRequired>
+        <VerificationRequired>{children}</VerificationRequired>
       </div>
-      <Footer />
+      {/* <Footer /> */}
     </>
   );
 }

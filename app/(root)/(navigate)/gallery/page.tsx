@@ -20,8 +20,7 @@ export default function Home() {
           exceptional grooming.
         </p>
 
-        <Button className="bg-[#525252] rounded-full py-2">Videos</Button>
-        <Button className="bg-[#525252] rounded-full py-2">Photos</Button>
+        <Button className="bg-[#525252] rounded-full py-2">Haircuts</Button>
         <Button className="bg-[#525252] rounded-full py-2">Barbershop</Button>
       </section>
     </main>

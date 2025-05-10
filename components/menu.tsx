@@ -15,32 +15,39 @@ import {
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu";
 
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "./ui/accordion";
+
 export function Menu() {
   const { user, isAuthenticated, logout } = useAuth();
   // Use state to track client-side rendering
   const [isClient, setIsClient] = React.useState(false);
-  
+
   React.useEffect(() => {
     setIsClient(true);
   }, []);
-  
+
   const handleLogout = () => {
     logout();
     // No need to redirect - the auth context will update state
   };
-  
+
   return (
     <NavigationMenu className="w-full">
       <NavigationMenuList>
         <NavigationMenuItem className="ml-auto hidden md:block">
-          {isClient && (
-            isAuthenticated ? (
+          {isClient &&
+            (isAuthenticated ? (
               <div className="flex items-center gap-4">
                 <span className="text-sm">
-                  Hello, {user?.first_name || 'User'}
+                  Hello, {user?.first_name || "User"}
                 </span>
-                <button 
-                  onClick={handleLogout} 
+                <button
+                  onClick={handleLogout}
                   className={navigationMenuTriggerStyle()}
                 >
                   LOGOUT
@@ -50,8 +57,7 @@ export function Menu() {
               <Link href="/login" className={navigationMenuTriggerStyle()}>
                 LOGIN
               </Link>
-            )
-          )}
+            ))}
         </NavigationMenuItem>
 
         <NavigationMenuItem>
@@ -74,20 +80,30 @@ export function Menu() {
           <NavigationMenuContent>
             <ul className="grid gap-3 p-6">
               <ListItem href="/" title="HOME"></ListItem>
-              <ListItem href="/about-us" title="ABOUT US"></ListItem>
+              <Accordion type="multiple" className="px-3">
+                <AccordionItem value="items">
+                  <AccordionTrigger>ABOUT</AccordionTrigger>
+                  <AccordionContent className="pl-2 mt-1">
+                    <a href="/about/our-story">OUR STORY</a>
+                  </AccordionContent>
+                  <AccordionContent className="pl-2 mt-1">
+                    <a href="/about/our-ethos">OUR ETHOS</a>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
               <ListItem href="/testimonials" title="TESTIMONIALS"></ListItem>
               <ListItem href="/contacts" title="CONTACTS"></ListItem>
               <ListItem href="/gallery" title="GALLERY"></ListItem>
               <ListItem href="/barbers" title="BARBERS"></ListItem>
               <ListItem href="/services" title="SERVICES"></ListItem>
               <ListItem href="/careers" title="CAREERS"></ListItem>
-              
+
               {/* Authentication Links */}
               <div className="pt-4 mt-4 border-t border-gray-200">
                 {isClient && isAuthenticated ? (
                   <>
                     <div className="mb-3 text-sm font-medium px-3">
-                      Logged in as {user?.first_name || 'User'}
+                      Logged in as {user?.first_name || "User"}
                     </div>
                     <li>
                       <NavigationMenuLink asChild>
@@ -95,7 +111,9 @@ export function Menu() {
                           onClick={handleLogout}
                           className="block select-none space-y-1 rounded-md p-3 w-full text-left leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
                         >
-                          <div className="text-sm font-medium leading-none">LOGOUT</div>
+                          <div className="text-sm font-medium leading-none">
+                            LOGOUT
+                          </div>
                         </button>
                       </NavigationMenuLink>
                     </li>
@@ -117,7 +135,7 @@ export function Menu() {
 
 const ListItem = React.forwardRef<
   React.ElementRef<typeof Link>,
-  Omit<React.ComponentPropsWithoutRef<typeof Link>, 'className'> & {
+  Omit<React.ComponentPropsWithoutRef<typeof Link>, "className"> & {
     className?: string;
     title: string;
   }
