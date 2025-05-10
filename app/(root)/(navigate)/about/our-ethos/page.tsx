@@ -59,8 +59,9 @@ export default function Home() {
           </p>
 
           <p className="text-end w-3/4 self-end">
-            "Some climb the first mountain to prove themselves.But the second
-            one is where we rise — for meaning, for others, for inner peace." 
+            &quot;Some climb the first mountain to prove themselves.But the
+            second one is where we rise — for meaning, for others, for inner
+            peace.&quot;
           </p>
         </div>
       </section>
