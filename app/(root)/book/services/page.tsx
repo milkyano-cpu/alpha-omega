@@ -7,12 +7,16 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { BookingService, TeamMember, Service } from "@/lib/booking-service";
+import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function ServiceSelection() {
   const [barbers, setBarbers] = useState<TeamMember[]>([]);
   const [services, setServices] = useState<Record<number, Service[]>>({});
   const [expandedBarber, setExpandedBarber] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [agreed, setAgreed] = useState(false);
+  const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const { isAuthenticated } = useAuth();
@@ -117,7 +121,7 @@ export default function ServiceSelection() {
   }
 
   return (
-    <main className="flex flex-col gap-20 mt-40">
+    <main className="flex mt-40 mb-72">
       {barbers.length === 0 ? (
         <section className="container mx-auto text-center py-20">
           <p>No barbers available at the moment. Please check back later.</p>
@@ -126,7 +130,7 @@ export default function ServiceSelection() {
         barbers.map((barber) => (
           <section
             key={barber.id}
-            className="container mx-auto flex flex-col md:flex-row justify-center items-start py-10 gap-8 px-4"
+            className="container mx-auto flex flex-col justify-center items-center text-center gap-8 px-2 py-6"
           >
             <div className="w-full md:w-80">
               <div className="rounded-lg overflow-hidden shadow-md">
@@ -140,70 +144,92 @@ export default function ServiceSelection() {
               </div>
             </div>
 
-            <div className="w-[1px] h-96 bg-[#D9D9D9] hidden md:block" />
-
             <div className="flex flex-col gap-4 w-full md:w-1/3">
               <h1 className="text-4xl md:text-5xl font-bold">
                 {barber.first_name} {barber.last_name}
               </h1>
+
+              <p className="text-lg">🇪🇸 | Espanól</p>
               <p className="text-lg">
                 [IG@{barber.first_name.toLowerCase()}.barber]{" "}
                 <span className="ml-1">({barber.status})</span>
               </p>
-              <div className="w-full h-[1px] bg-green-500" />
+              <div className="w-full h-[1px] bg-gray-900" />
 
               {/* Services Accordion */}
-              <div className="mt-4 max-w-md">
-                {/* Accordion Header */}
-                <button
-                  onClick={() => toggleAccordion(barber.id)}
-                  className="w-full flex justify-between items-center bg-[#333333] text-white rounded-lg p-4 hover:bg-[#3d3d3d] transition-colors"
-                  aria-expanded={expandedBarber === barber.id}
-                  aria-controls={`services-${barber.id}`}
-                >
-                  <div className="text-lg font-medium">
-                    View Services
-                    <span className="ml-2 text-gray-300 text-sm">
-                      ({getPriceRange(services[barber.id] || [])})
-                    </span>
-                  </div>
-                  {expandedBarber === barber.id ? (
-                    <ChevronUp className="h-5 w-5" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5" />
-                  )}
-                </button>
-
+              <div className="mt-4 max-w-md relative">
                 {/* Accordion Content */}
                 {expandedBarber === barber.id && (
-                  <div className="mt-4 space-y-4">
+                  <div className="mt-18 space-y-4 absolute w-full">
                     {services[barber.id]?.length > 0 ? (
                       services[barber.id].map((service) => (
                         <div
                           key={service.id}
-                          className="bg-[#111111] rounded-lg overflow-hidden mb-4"
+                          className="bg-[#545454] rounded-xl overflow-hidden mb-4"
                         >
-                          <div className="p-4">
-                            <div className="flex flex-col md:flex-row justify-between gap-3">
+                          <div className="p-2">
+                            <div className="flex flex-col gap-3">
                               <div>
                                 <h3 className="font-bold text-lg text-white">
                                   {service.name}
                                 </h3>
-                                <p className="text-gray-300 text-sm">
+                                <h3 className="font-bold text-white my-4">
+                                  ${service.price_amount}
+                                </h3>
+
+                                <p className="text-gray-300">
                                   ${(service.price_amount / 50).toFixed(0)} +
                                   [15% Surcharge On Sundays]
                                 </p>
                               </div>
                               <Button
-                                onClick={() =>
-                                  handleBookService(barber.id, service)
-                                }
-                                className="bg-green-600 hover:bg-green-700 text-white text-base px-6 py-2 rounded"
+                                onClick={() => setOpen(true)}
+                                className="bg-[#292929] text-white w-full text-2xl px-6 py-2 rounded-xl"
                               >
                                 Book Now
                               </Button>
                             </div>
                           </div>
+
+                          <Dialog open={open} onOpenChange={setOpen}>
+                            <DialogContent className="max-w-md bg-white rounded-xl">
+                              <DialogHeader className="text-center text-xl font-bold mb-4">
+                                BOOK YOUR APPOINTMENT
+                              </DialogHeader>
+
+                              <div
+                                style={{ whiteSpace: "pre-line" }}
+                                className="p-4 border rounded-md space-y-4 text-sm text-gray-800 max-h-96 overflow-y-auto"
+                              >
+                                {policy}
+                              </div>
+
+                              <div className="flex items-center space-x-2 pt-4">
+                                <Checkbox
+                                  id="agree"
+                                  checked={agreed}
+                                  onCheckedChange={() => setAgreed(!agreed)}
+                                />
+                                <label
+                                  htmlFor="agree"
+                                  className="text-sm font-medium leading-none"
+                                >
+                                  Tick to Agree
+                                </label>
+                              </div>
+
+                              <Button
+                                disabled={!agreed}
+                                onClick={() =>
+                                  agreed &&
+                                  handleBookService(barber.id, service)
+                                }
+                                className="w-full mt-4"
+                              >
+                                Book Now
+                              </Button>
+                            </DialogContent>
+                          </Dialog>
                         </div>
                       ))
                     ) : (
@@ -213,6 +239,20 @@ export default function ServiceSelection() {
                     )}
                   </div>
                 )}
+
+                {/* Accordion Header */}
+                <button
+                  onClick={() => toggleAccordion(barber.id)}
+                  className="w-full flex justify-center text-[#333333] rounded-lg p-4"
+                  aria-expanded={expandedBarber === barber.id}
+                  aria-controls={`services-${barber.id}`}
+                >
+                  {expandedBarber === barber.id ? (
+                    <ChevronUp className="h-12 w-12" />
+                  ) : (
+                    <ChevronDown className="h-12 w-12 animate-pulse" />
+                  )}
+                </button>
               </div>
             </div>
           </section>
@@ -221,3 +261,82 @@ export default function ServiceSelection() {
     </main>
   );
 }
+
+const policy = `
+We pride ourselves in offering a high quality of service and that begins with appointment based bookings. Our online system allows you to pick a stylist and time that’s convenient for you, and if you can’t make it you can reschedule within 24 hours of your appointment.
+
+Secure transactions
+Transactions are handled with bank-grade security
+
+Alpha Omega Mens Grooming
+Booking Policy & Client Experience Standards
+Where your confidence is crafted with precision.
+
+⸻
+
+Booking Deposit
+
+To confirm your appointment, a 50% non-refundable deposit is required at the time of booking. This guarantees your time with our artist and will be deducted from the total cost of your service.
+
+By proceeding with the deposit, you acknowledge and agree to the full terms and policies outlined below.
+
+⸻
+
+Rescheduling
+
+Appointments may be rescheduled with a minimum of 24 hours’ notice. Your deposit will be transferred to the new appointment. Rescheduling within 24 hours will result in the deposit being forfeited.
+
+⸻
+
+Cancellations
+
+To respect the time and preparation of our team, we do not accept cancellations within 24 hours of your appointment. Deposits are non-refundable in these cases.
+
+⸻
+
+No Shows
+
+Clients who miss an appointment without notice will be charged 100% of the scheduled service. Repeat no-shows may be removed from our client list.
+
+⸻
+
+Late Arrivals
+    •    A 10-minute grace period applies.
+    •    Arrivals beyond this may lead to a shortened service or loss of your appointment and deposit.
+    •    We always strive to run on time to respect every guest’s schedule.
+
+⸻
+
+Confirmation & Communication
+
+You’ll receive a confirmation and reminder via SMS or email before your booking. Please confirm promptly to avoid any confusion or cancellation.
+
+⸻
+
+Studio Etiquette
+
+To preserve the luxury atmosphere:
+    •    Please arrive solo unless accompanying a minor.
+    •    Phones on silent are appreciated.
+    •    Kindness, respect, and professionalism are expected from both sides.
+
+⸻
+
+VIP Privileges
+
+Clients with consistent attendance and respect for our policies may receive access to:
+    •    Priority bookings
+    •    Exclusive treatments
+    •    Private events & launches
+
+⸻
+
+Legal Notice
+
+By paying your deposit and booking an appointment, you agree to all terms listed. These policies are binding and in place to protect the integrity of our studio and ensure a premium experience for all clients.
+
+⸻
+
+Thank you for choosing Alpha Omega — where every detail is designed to elevate your confidence.
+
+`;

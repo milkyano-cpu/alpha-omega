@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-// import { Menu } from "./menu";
+import { Menu } from "./menu";
 import Link from "next/link";
 
 export function Navbar() {
@@ -63,7 +63,7 @@ export function Navbar() {
           </svg>
         </Link>
 
-        {/* <Menu /> */}
+        <Menu />
       </div>
     </nav>
   );

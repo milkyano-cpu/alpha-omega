@@ -1,4 +1,4 @@
-// import { Footer } from "@/components/footer";
+import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
 import { VerificationRequired } from "@/components/verification-required";
 
@@ -13,7 +13,7 @@ export default function RootLayout({
       <div className="pt-8">
         <VerificationRequired>{children}</VerificationRequired>
       </div>
-      {/* <Footer /> */}
+      <Footer />
     </>
   );
 }
