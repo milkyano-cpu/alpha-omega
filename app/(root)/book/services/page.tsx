@@ -121,7 +121,7 @@ export default function ServiceSelection() {
   }
 
   return (
-    <main className="flex mt-40 mb-72">
+    <main className="grid md:grid-cols-3 grid-cols-2 mt-40 mb-72">
       {barbers.length === 0 ? (
         <section className="container mx-auto text-center py-20">
           <p>No barbers available at the moment. Please check back later.</p>
@@ -133,7 +133,7 @@ export default function ServiceSelection() {
             className="container mx-auto flex flex-col justify-center items-center text-center gap-8 px-2 py-6"
           >
             <div className="w-full md:w-80">
-              <div className="rounded-lg overflow-hidden shadow-md">
+              <div className="rounded-lg md:rounded-2xl overflow-hidden shadow-md bg-black">
                 <Image
                   src={"/assets/barber-1.png"}
                   width={500}
@@ -144,7 +144,7 @@ export default function ServiceSelection() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-4 w-full md:w-1/3">
+            <div className="flex flex-col gap-4 w-full md:w-1/2">
               <h1 className="text-4xl md:text-5xl font-bold">
                 {barber.first_name} {barber.last_name}
               </h1>
@@ -160,7 +160,7 @@ export default function ServiceSelection() {
               <div className="mt-4 max-w-md relative">
                 {/* Accordion Content */}
                 {expandedBarber === barber.id && (
-                  <div className="mt-18 space-y-4 absolute w-full">
+                  <div className="mt-18 space-y-4 absolute w-full -z-10">
                     {services[barber.id]?.length > 0 ? (
                       services[barber.id].map((service) => (
                         <div
@@ -248,9 +248,9 @@ export default function ServiceSelection() {
                   aria-controls={`services-${barber.id}`}
                 >
                   {expandedBarber === barber.id ? (
-                    <ChevronUp className="h-12 w-12" />
+                    <ChevronUp className="h-12 w-12 -z-10" />
                   ) : (
-                    <ChevronDown className="h-12 w-12 animate-pulse" />
+                    <ChevronDown className="h-12 w-12 animate-pulse -z-10" />
                   )}
                 </button>
               </div>
