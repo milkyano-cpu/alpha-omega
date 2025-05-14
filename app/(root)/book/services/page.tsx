@@ -160,7 +160,7 @@ export default function ServiceSelection() {
               <div className="mt-4 max-w-md relative">
                 {/* Accordion Content */}
                 {expandedBarber === barber.id && (
-                  <div className="mt-18 space-y-4 absolute w-full -z-10">
+                  <div className="mt-18 space-y-4 absolute w-full z-0">
                     {services[barber.id]?.length > 0 ? (
                       services[barber.id].map((service) => (
                         <div
