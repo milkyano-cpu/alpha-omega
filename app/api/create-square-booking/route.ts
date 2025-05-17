@@ -3,7 +3,8 @@ import { Client, Environment } from "square";
 
 // Square client configuration - reuse the same client from payment processing
 const square = new Client({
-  environment: Environment.Production,
+  // environment: Environment.Production,
+  environment: Environment.Sandbox,
   accessToken: process.env.SQUARE_ACCESS_TOKEN || "",
 });
 

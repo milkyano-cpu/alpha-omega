@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { Client, Environment } from "square";
+import { NextRequest, NextResponse } from 'next/server';
+import { Client, Environment } from 'square';
 
 // Square client configuration
 const square = new Client({
-  environment: Environment.Production,
-  accessToken: process.env.SQUARE_ACCESS_TOKEN || "",
+  // environment: Environment.Production,
+  environment: Environment.Sandbox,
+  accessToken: process.env.SQUARE_ACCESS_TOKEN || ''
 });
 
 export async function POST(request: NextRequest) {
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
 
     if (!sourceId || !amount || !idempotencyKey || !locationId) {
       return NextResponse.json(
-        { success: false, message: "Missing required payment information" },
+        { success: false, message: 'Missing required payment information' },
         { status: 400 }
       );
     }
@@ -26,12 +27,12 @@ export async function POST(request: NextRequest) {
       sourceId,
       amountMoney: {
         amount: BigInt(Math.round(amount)), // Square expects the amount in cents
-        currency: "AUD",
+        currency: 'AUD'
       },
       locationId,
       idempotencyKey,
-      note: "Alpha Omega Barber Shop - Appointment Deposit",
-      statementDescriptionIdentifier: "ALPHAOMEGA",
+      note: 'Alpha Omega Barber Shop - Appointment Deposit',
+      statementDescriptionIdentifier: 'ALPHAOMEGA'
     };
 
     // Add customer details if available
@@ -40,9 +41,9 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(
-      "Payment request:",
+      'Payment request:',
       JSON.stringify(paymentRequest, (key, value) =>
-        typeof value === "bigint" ? value.toString() : value
+        typeof value === 'bigint' ? value.toString() : value
       )
     );
 
@@ -54,25 +55,25 @@ export async function POST(request: NextRequest) {
       payment: {
         id: response.result.payment?.id,
         status: response.result.payment?.status,
-        receiptUrl: response.result.payment?.receiptUrl,
-      },
+        receiptUrl: response.result.payment?.receiptUrl
+      }
     });
   } catch (error: any) {
-    console.error("Payment processing error:", error);
+    console.error('Payment processing error:', error);
 
     // Log detailed error information for debugging
     if (error && error.response) {
       console.error(
-        "Square API response error:",
+        'Square API response error:',
         error.response.status,
         error.response.data
       );
     } else if (error && error.request) {
-      console.error("No response received from Square API");
+      console.error('No response received from Square API');
     }
 
     // Format Square API errors if available
-    let errorMessage = "Payment processing failed";
+    let errorMessage = 'Payment processing failed';
     let errorDetails = null;
 
     if (error && error.errors && Array.isArray(error.errors)) {
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         message: errorMessage,
-        details: errorDetails,
+        details: errorDetails
       },
       { status: 500 }
     );
