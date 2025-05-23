@@ -2,21 +2,22 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { BookingService, TeamMember, Service } from "@/lib/booking-service";
-import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export default function ServiceSelection() {
   const [barbers, setBarbers] = useState<TeamMember[]>([]);
   const [services, setServices] = useState<Record<number, Service[]>>({});
-  const [expandedBarber, setExpandedBarber] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedBarber, setSelectedBarber] = useState<TeamMember | null>(null);
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [showServicesModal, setShowServicesModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
   const [agreed, setAgreed] = useState(false);
-  const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const { isAuthenticated } = useAuth();
@@ -73,14 +74,28 @@ export default function ServiceSelection() {
     fetchData();
   }, [isAuthenticated, router]);
 
-  const handleBookService = (barberId: number, service: Service) => {
-    localStorage.setItem("selectedService", JSON.stringify(service));
-    localStorage.setItem("selectedBarberId", barberId.toString());
-    router.push("/book/appointment");
+  const handleViewServices = (barber: TeamMember) => {
+    setSelectedBarber(barber);
+    setShowServicesModal(true);
   };
 
-  const toggleAccordion = (barberId: number) => {
-    setExpandedBarber(expandedBarber === barberId ? null : barberId);
+  const handleSelectService = (service: Service) => {
+    setSelectedService(service);
+    setShowServicesModal(false);
+    setShowTermsModal(true);
+  };
+
+  const handleBookService = () => {
+    if (selectedBarber && selectedService && agreed) {
+      localStorage.setItem("selectedService", JSON.stringify(selectedService));
+      localStorage.setItem("selectedBarberId", selectedBarber.id.toString());
+      router.push("/book/appointment");
+    }
+  };
+
+  const resetSelection = () => {
+    setSelectedService(null);
+    setAgreed(false);
   };
 
   if (isLoading) {
@@ -110,143 +125,161 @@ export default function ServiceSelection() {
   }
 
   return (
-    <main className="grid md:grid-cols-3 grid-cols-2 mt-40 mb-72">
+    <main className="container mx-auto px-4 py-10 mt-20 mb-20">
+      <div className="text-center mb-10">
+        <h1 className="text-4xl md:text-5xl font-bold mb-4">Choose Your Barber</h1>
+        <p className="text-lg text-gray-600">Select a barber to view their available services</p>
+      </div>
+
       {barbers.length === 0 ? (
-        <section className="container mx-auto text-center py-20">
-          <p>No barbers available at the moment. Please check back later.</p>
-        </section>
+        <div className="text-center py-20">
+          <p className="text-gray-500">No barbers available at the moment. Please check back later.</p>
+        </div>
       ) : (
-        barbers.map((barber) => (
-          <section
-            key={barber.id}
-            className="container mx-auto flex flex-col justify-center items-center text-center gap-8 px-2 py-6"
-          >
-            <div className="w-full md:w-80">
-              <div className="rounded-lg md:rounded-2xl overflow-hidden shadow-md bg-black">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+          {barbers.map((barber) => (
+            <div
+              key={barber.id}
+              className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
+            >
+              <div className="aspect-square bg-black relative">
                 <Image
                   src={"/assets/barber-1.png"}
-                  width={500}
-                  height={500}
+                  width={400}
+                  height={400}
                   alt={`${barber.first_name} ${barber.last_name}`}
-                  className="object-cover"
+                  className="object-cover w-full h-full"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                <div className="absolute bottom-4 left-4 text-white">
+                  <h2 className="text-2xl font-bold">{barber.first_name}</h2>
+                  <p className="text-sm opacity-90">{barber.status}</p>
+                </div>
               </div>
-            </div>
 
-            <div className="flex flex-col gap-4 w-full md:w-1/2">
-              <h1 className="text-4xl md:text-5xl font-bold">
-                {barber.first_name} {barber.last_name}
-              </h1>
-
-              <p className="text-lg">🇪🇸 | Espanól</p>
-              <p className="text-lg">
-                [IG@{barber.first_name.toLowerCase()}.barber]{" "}
-                <span className="ml-1">({barber.status})</span>
-              </p>
-              <div className="w-full h-[1px] bg-gray-900" />
-
-              {/* Services Accordion */}
-              <div className="mt-4 max-w-md relative">
-                {/* Accordion Content */}
-                {expandedBarber === barber.id && (
-                  <div className="mt-18 space-y-4 absolute w-full z-0">
-                    {services[barber.id]?.length > 0 ? (
-                      services[barber.id].map((service) => (
-                        <div
-                          key={service.id}
-                          className="bg-[#545454] rounded-xl overflow-hidden mb-4"
-                        >
-                          <div className="p-2">
-                            <div className="flex flex-col gap-3">
-                              <div>
-                                <h3 className="font-bold text-lg text-white">
-                                  {service.name}
-                                </h3>
-                                <h3 className="font-bold text-white my-4">
-                                  ${service.price_amount}
-                                </h3>
-
-                                <p className="text-gray-300">
-                                  ${(service.price_amount / 100).toFixed(0)} +
-                                  [15% Surcharge On Sundays]
-                                </p>
-                              </div>
-                              <Button
-                                onClick={() => setOpen(true)}
-                                className="bg-[#292929] text-white w-full text-2xl px-6 py-2 rounded-xl"
-                              >
-                                Book Now
-                              </Button>
-                            </div>
-                          </div>
-
-                          <Dialog open={open} onOpenChange={setOpen}>
-                            <DialogContent className="max-w-md bg-white rounded-xl">
-                              <DialogHeader className="text-center text-xl font-bold mb-4">
-                                BOOK YOUR APPOINTMENT
-                              </DialogHeader>
-
-                              <div
-                                style={{ whiteSpace: "pre-line" }}
-                                className="p-4 border rounded-md space-y-4 text-sm text-gray-800 max-h-96 overflow-y-auto"
-                              >
-                                {policy}
-                              </div>
-
-                              <div className="flex items-center space-x-2 pt-4">
-                                <Checkbox
-                                  id="agree"
-                                  checked={agreed}
-                                  onCheckedChange={() => setAgreed(!agreed)}
-                                />
-                                <label
-                                  htmlFor="agree"
-                                  className="text-sm font-medium leading-none"
-                                >
-                                  Tick to Agree
-                                </label>
-                              </div>
-
-                              <Button
-                                disabled={!agreed}
-                                onClick={() =>
-                                  agreed &&
-                                  handleBookService(barber.id, service)
-                                }
-                                className="w-full mt-4"
-                              >
-                                Book Now
-                              </Button>
-                            </DialogContent>
-                          </Dialog>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-center py-4">
-                        No services available for this barber.
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Accordion Header */}
-                <button
-                  onClick={() => toggleAccordion(barber.id)}
-                  className="w-full flex justify-center text-[#333333] rounded-lg p-4"
-                  aria-expanded={expandedBarber === barber.id}
-                  aria-controls={`services-${barber.id}`}
-                >
-                  {expandedBarber === barber.id ? (
-                    <ChevronUp className="h-12 w-12 -z-10" />
-                  ) : (
-                    <ChevronDown className="h-12 w-12 animate-pulse -z-10" />
+              <div className="p-6">
+                <div className="space-y-2 mb-4">
+                  <p className="text-gray-600 flex items-center gap-2">
+                    <span className="text-xl">🇪🇸</span>
+                    <span>Español</span>
+                  </p>
+                  <p className="text-gray-600 text-sm">
+                    @{barber.first_name.toLowerCase()}.barber
+                  </p>
+                  {services[barber.id] && (
+                    <p className="text-sm text-gray-500">
+                      {services[barber.id].length} services available
+                    </p>
                   )}
-                </button>
+                </div>
+
+                <Button
+                  onClick={() => handleViewServices(barber)}
+                  className="w-full bg-black text-white hover:bg-gray-800"
+                  disabled={!services[barber.id] || services[barber.id].length === 0}
+                >
+                  View Services
+                </Button>
               </div>
             </div>
-          </section>
-        ))
+          ))}
+        </div>
       )}
+
+      {/* Services Modal */}
+      <Dialog open={showServicesModal} onOpenChange={setShowServicesModal}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden bg-white">
+          <DialogHeader className="border-b pb-4">
+            <DialogTitle className="text-2xl font-bold">
+              {selectedBarber ? `${selectedBarber.first_name}'s Services` : 'Services'}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="overflow-y-auto max-h-[calc(90vh-200px)] py-4">
+            {selectedBarber && services[selectedBarber.id] ? (
+              <div className="grid gap-4">
+                {services[selectedBarber.id].map((service) => (
+                  <div
+                    key={service.id}
+                    className="border rounded-lg p-4 hover:border-gray-400 cursor-pointer transition-all"
+                    onClick={() => handleSelectService(service)}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-lg">{service.name}</h3>
+                        {service.description && (
+                          <p className="text-gray-600 text-sm mt-1">{service.description}</p>
+                        )}
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className="text-sm text-gray-500">
+                            Duration: {service.duration > 10000 ? Math.round(service.duration / 60000) : service.duration} min
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right ml-4">
+                        <p className="text-xl font-bold">${(service.price_amount / 100).toFixed(2)}</p>
+                        <p className="text-xs text-gray-500">+15% on Sundays</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center py-8 text-gray-500">No services available</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Terms Modal */}
+      <Dialog open={showTermsModal} onOpenChange={(open) => {
+        setShowTermsModal(open);
+        if (!open) resetSelection();
+      }}>
+        <DialogContent className="max-w-md bg-white rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">
+              Book Your Appointment
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedService && (
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              <h4 className="font-semibold">{selectedService.name}</h4>
+              <p className="text-2xl font-bold mt-1">${(selectedService.price_amount / 100).toFixed(2)}</p>
+            </div>
+          )}
+
+          <div
+            style={{ whiteSpace: "pre-line" }}
+            className="p-4 border rounded-md space-y-4 text-sm text-gray-800 max-h-96 overflow-y-auto"
+          >
+            {policy}
+          </div>
+
+          <div className="flex items-center space-x-2 pt-4">
+            <Checkbox
+              id="agree"
+              checked={agreed}
+              onCheckedChange={(checked) => setAgreed(checked as boolean)}
+            />
+            <label
+              htmlFor="agree"
+              className="text-sm font-medium leading-none cursor-pointer"
+            >
+              I agree to the terms and conditions
+            </label>
+          </div>
+
+          <Button
+            disabled={!agreed}
+            onClick={handleBookService}
+            className="w-full mt-4"
+          >
+            Proceed to Booking
+          </Button>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
