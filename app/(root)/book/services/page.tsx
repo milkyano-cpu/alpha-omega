@@ -38,11 +38,6 @@ export default function ServiceSelection() {
         const barberList = await BookingService.getTeamMembers();
         setBarbers(barberList);
 
-        // Auto-expand first barber if only one exists
-        if (barberList.length === 1) {
-          setExpandedBarber(barberList[0].id);
-        }
-
         const servicesByBarber: Record<number, Service[]> = {};
         for (const barber of barberList) {
           try {
