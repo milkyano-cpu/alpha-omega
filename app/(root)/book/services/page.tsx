@@ -83,16 +83,6 @@ export default function ServiceSelection() {
     setExpandedBarber(expandedBarber === barberId ? null : barberId);
   };
 
-  // Calculate price range for services
-  const getPriceRange = (services: Service[]): string => {
-    if (!services || services.length === 0) return "$0 AUD";
-    const prices = services.map((s) => s.price_amount / 50);
-    const minPrice = Math.min(...prices);
-    const maxPrice = Math.max(...prices);
-    return minPrice === maxPrice
-      ? `$${minPrice} AUD`
-      : `$${minPrice}-$${maxPrice} AUD`;
-  };
 
   if (isLoading) {
     return (
