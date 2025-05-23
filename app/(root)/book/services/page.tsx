@@ -46,13 +46,13 @@ export default function ServiceSelection() {
         for (const barber of barberList) {
           try {
             const barberServices = await BookingService.getTeamMemberServices(
-              barber.id,
+              barber.id
             );
             servicesByBarber[barber.id] = barberServices;
           } catch (serviceErr) {
             console.error(
               `Failed to fetch services for barber ${barber.id}:`,
-              serviceErr,
+              serviceErr
             );
           }
         }
@@ -62,7 +62,7 @@ export default function ServiceSelection() {
         setError(
           err instanceof Error
             ? err.message
-            : "Failed to load barbers and services",
+            : "Failed to load barbers and services"
         );
         console.error("Error fetching data:", err);
       } finally {
@@ -82,7 +82,6 @@ export default function ServiceSelection() {
   const toggleAccordion = (barberId: number) => {
     setExpandedBarber(expandedBarber === barberId ? null : barberId);
   };
-
 
   if (isLoading) {
     return (
@@ -168,7 +167,7 @@ export default function ServiceSelection() {
                                 </h3>
 
                                 <p className="text-gray-300">
-                                  ${(service.price_amount / 50).toFixed(0)} +
+                                  ${(service.price_amount / 100).toFixed(0)} +
                                   [15% Surcharge On Sundays]
                                 </p>
                               </div>
