@@ -6,7 +6,12 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { BookingService, TeamMember, Service } from "@/lib/booking-service";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export default function ServiceSelection() {
@@ -122,64 +127,74 @@ export default function ServiceSelection() {
   return (
     <main className="container mx-auto px-4 py-10 mt-20 mb-20">
       <div className="text-center mb-10">
-        <h1 className="text-4xl md:text-5xl font-bold mb-4">Choose Your Barber</h1>
-        <p className="text-lg text-gray-600">Select a barber to view their available services</p>
+        <h1 className="text-4xl md:text-5xl font-bold mb-4">
+          Choose Your Barber
+        </h1>
+        <p className="text-lg text-gray-600">
+          Select a barber to view their available services
+        </p>
       </div>
 
       {barbers.length === 0 ? (
         <div className="text-center py-20">
-          <p className="text-gray-500">No barbers available at the moment. Please check back later.</p>
+          <p className="text-gray-500">
+            No barbers available at the moment. Please check back later.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {barbers
-            .filter((barber) => services[barber.id] && services[barber.id].length > 0)
+            .filter(
+              (barber) => services[barber.id] && services[barber.id].length > 0
+            )
             .map((barber) => (
-            <div
-              key={barber.id}
-              className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
-            >
-              <div className="aspect-square bg-black relative">
-                <Image
-                  src={"/assets/barber-1.png"}
-                  width={400}
-                  height={400}
-                  alt={`${barber.first_name} ${barber.last_name}`}
-                  className="object-cover w-full h-full"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                <div className="absolute bottom-4 left-4 text-white">
-                  <h2 className="text-2xl font-bold">{barber.first_name}</h2>
-                  <p className="text-sm opacity-90">{barber.status}</p>
+              <div
+                key={barber.id}
+                className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
+              >
+                <div className="aspect-square bg-black relative">
+                  <Image
+                    src={"/assets/barber-1.png"}
+                    width={400}
+                    height={400}
+                    alt={`${barber.first_name} ${barber.last_name}`}
+                    className="object-cover w-full h-full"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                  <div className="absolute bottom-4 left-4 text-white">
+                    <h2 className="text-2xl font-bold">{barber.first_name}</h2>
+                    <p className="text-sm opacity-90">{barber.status}</p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="p-6">
-                <div className="space-y-2 mb-4">
-                  <p className="text-gray-600 flex items-center gap-2">
-                    <span className="text-xl">🇪🇸</span>
-                    <span>Español</span>
-                  </p>
-                  <p className="text-gray-600 text-sm">
-                    @{barber.first_name.toLowerCase()}.barber
-                  </p>
-                  {services[barber.id] && (
-                    <p className="text-sm text-gray-500">
-                      {services[barber.id].length} services available
+                <div className="p-6">
+                  <div className="space-y-2 mb-4">
+                    <p className="text-gray-600 flex items-center gap-2">
+                      <span className="text-xl">🇪🇸</span>
+                      <span>Español</span>
                     </p>
-                  )}
-                </div>
+                    <p className="text-gray-600 text-sm">
+                      @{barber.first_name.toLowerCase()}.barber
+                    </p>
+                    {services[barber.id] && (
+                      <p className="text-sm text-gray-500">
+                        {services[barber.id].length} services available
+                      </p>
+                    )}
+                  </div>
 
-                <Button
-                  onClick={() => handleViewServices(barber)}
-                  className="w-full bg-black text-white hover:bg-gray-800"
-                  disabled={!services[barber.id] || services[barber.id].length === 0}
-                >
-                  View Services
-                </Button>
+                  <Button
+                    onClick={() => handleViewServices(barber)}
+                    className="w-full bg-black text-white hover:bg-gray-800"
+                    disabled={
+                      !services[barber.id] || services[barber.id].length === 0
+                    }
+                  >
+                    View Services
+                  </Button>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
       )}
 
@@ -188,10 +203,12 @@ export default function ServiceSelection() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden bg-white">
           <DialogHeader className="border-b pb-4">
             <DialogTitle className="text-2xl font-bold">
-              {selectedBarber ? `${selectedBarber.first_name}'s Services` : 'Services'}
+              {selectedBarber
+                ? `${selectedBarber.first_name}'s Services`
+                : "Services"}
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="overflow-y-auto max-h-[calc(90vh-200px)] py-4">
             {selectedBarber && services[selectedBarber.id] ? (
               <div className="grid gap-4">
@@ -203,18 +220,28 @@ export default function ServiceSelection() {
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <h3 className="font-semibold text-lg">{service.name}</h3>
+                        <h3 className="font-semibold text-lg">
+                          {service.name}
+                        </h3>
                         {service.description && (
-                          <p className="text-gray-600 text-sm mt-1">{service.description}</p>
+                          <p className="text-gray-600 text-sm mt-1">
+                            {service.description}
+                          </p>
                         )}
                         <div className="flex items-center gap-4 mt-2">
                           <span className="text-sm text-gray-500">
-                            Duration: {service.duration > 10000 ? Math.round(service.duration / 60000) : service.duration} min
+                            Duration:{" "}
+                            {service.duration > 10000
+                              ? Math.round(service.duration / 60000)
+                              : service.duration}{" "}
+                            min
                           </span>
                         </div>
                       </div>
                       <div className="text-right ml-4">
-                        <p className="text-xl font-bold">${(service.price_amount / 100).toFixed(2)}</p>
+                        <p className="text-xl font-bold">
+                          ${(service.price_amount / 50).toFixed(2)}
+                        </p>
                         <p className="text-xs text-gray-500">+15% on Sundays</p>
                       </div>
                     </div>
@@ -222,17 +249,22 @@ export default function ServiceSelection() {
                 ))}
               </div>
             ) : (
-              <p className="text-center py-8 text-gray-500">No services available</p>
+              <p className="text-center py-8 text-gray-500">
+                No services available
+              </p>
             )}
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Terms Modal */}
-      <Dialog open={showTermsModal} onOpenChange={(open) => {
-        setShowTermsModal(open);
-        if (!open) resetSelection();
-      }}>
+      <Dialog
+        open={showTermsModal}
+        onOpenChange={(open) => {
+          setShowTermsModal(open);
+          if (!open) resetSelection();
+        }}
+      >
         <DialogContent className="max-w-md bg-white rounded-xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">
@@ -243,7 +275,9 @@ export default function ServiceSelection() {
           {selectedService && (
             <div className="bg-gray-50 rounded-lg p-4 mb-4">
               <h4 className="font-semibold">{selectedService.name}</h4>
-              <p className="text-2xl font-bold mt-1">${(selectedService.price_amount / 100).toFixed(2)}</p>
+              <p className="text-2xl font-bold mt-1">
+                ${(selectedService.price_amount / 100).toFixed(2)}
+              </p>
             </div>
           )}
 
