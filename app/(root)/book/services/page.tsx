@@ -223,6 +223,7 @@ export default function ServiceSelection() {
                     <div
                       key={service.id}
                       className="border rounded-lg p-3 hover:border-black hover:shadow-md hover:bg-gray-50 active:scale-[0.98] cursor-pointer transition-all duration-150 group"
+                      onClick={() => handleSelectService(service)}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex-1 min-w-0">
@@ -250,13 +251,9 @@ export default function ServiceSelection() {
                             </p>
                             <p className="text-xs text-gray-500">+15% Sun</p>
                           </div>
-                          <Button
-                            onClick={() => handleSelectService(service)}
-                            size="sm"
-                            className="bg-black hover:bg-gray-800 active:bg-gray-900 text-white px-4 py-1.5 h-auto transition-all hover:scale-105 active:scale-95"
-                          >
+                          <div className="bg-black text-white px-4 py-1.5 rounded-md text-sm font-medium group-hover:bg-gray-800">
                             Book
-                          </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
