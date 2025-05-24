@@ -131,9 +131,8 @@ export default function Home() {
             alt="Opening Time 3d"
           />
         </div>
-      </section>
-
-      <section className="flex flex-col gap-8 px-4 md:w-2xl container mx-auto">
+        
+        <div className="flex flex-col gap-6 container mx-auto max-w-2xl mt-6">
         <p className="text-center">
           At Alpha Omega, we value your time and convenience. Check out our
           flexible opening hours designed to fit seamlessly into your schedule,
@@ -141,36 +140,46 @@ export default function Home() {
           the weekend.
         </p>
 
-        <div className="flex justify-evenly">
-          <div className="flex flex-col gap-4">
-            <p>Monday</p>
-            <p>Tuesday</p>
-            <p>Wednesday</p>
-            <p>Thursday</p>
-            <p>Friday</p>
-            <p>Saturday</p>
-            <p>Sunday</p>
-          </div>
-
-          <div className="flex flex-col gap-4">
-            <p>-</p>
-            <p>-</p>
-            <p>-</p>
-            <p>-</p>
-            <p>-</p>
-            <p>-</p>
-            <p>-</p>
-          </div>
-
-          <div className="flex flex-col gap-4">
-            <p>Closed</p>
-            <p>Closed</p>
-            <p>10am - 7pm</p>
-            <p>10am - 7pm</p>
-            <p>10am - 7pm</p>
-            <p>8am - 5pm</p>
-            <p>8am - 5pm</p>
-          </div>
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-3 px-6 font-medium text-gray-900">Day</th>
+                <th className="text-right py-3 px-6 font-medium text-gray-900">Hours</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="py-3 px-6 text-gray-700">Monday</td>
+                <td className="py-3 px-6 text-right text-gray-500">Closed</td>
+              </tr>
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="py-3 px-6 text-gray-700">Tuesday</td>
+                <td className="py-3 px-6 text-right text-gray-500">Closed</td>
+              </tr>
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="py-3 px-6 text-gray-700">Wednesday</td>
+                <td className="py-3 px-6 text-right text-gray-900">10:00 AM - 7:00 PM</td>
+              </tr>
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="py-3 px-6 text-gray-700">Thursday</td>
+                <td className="py-3 px-6 text-right text-gray-900">10:00 AM - 7:00 PM</td>
+              </tr>
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="py-3 px-6 text-gray-700">Friday</td>
+                <td className="py-3 px-6 text-right text-gray-900">10:00 AM - 7:00 PM</td>
+              </tr>
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="py-3 px-6 text-gray-700">Saturday</td>
+                <td className="py-3 px-6 text-right text-gray-900">8:00 AM - 5:00 PM</td>
+              </tr>
+              <tr className="hover:bg-gray-50 transition-colors">
+                <td className="py-3 px-6 text-gray-700">Sunday</td>
+                <td className="py-3 px-6 text-right text-gray-900">8:00 AM - 5:00 PM</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
         </div>
       </section>
 
