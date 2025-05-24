@@ -11,7 +11,7 @@ export function Footer() {
     { label: "Contact Us", href: "/contact" },
     { label: "Gallery", href: "/gallery" },
     { label: "Barbers", href: "/barbers" },
-    { label: "Hiring", href: "/hiring" },
+    { label: "Hiring", href: "/hiring" }
   ];
 
   const workingHours = [
@@ -21,7 +21,7 @@ export function Footer() {
     { day: "Thursday", hours: "10am - 7pm" },
     { day: "Friday", hours: "10am - 7pm" },
     { day: "Saturday", hours: "8am - 5pm" },
-    { day: "Sunday", hours: "8am - 5pm" },
+    { day: "Sunday", hours: "8am - 5pm" }
   ];
 
   const locations = [
@@ -34,15 +34,15 @@ export function Footer() {
     ["Bentleigh East", "Chadstone"],
     ["Ashwood", "Burwood"],
     ["Burwood East", "Wheelers Hills"],
-    ["Noble Park", "Hughesdale"],
+    ["Noble Park", "Hughesdale"]
   ];
 
   return (
     <footer className="bg-[#0A0A0A] text-white text-sm">
       {/* Top Section */}
-      <div className="flex flex-col md:flex-row items-center justify-center text-center gap-8 py-10 bg-[#272727]">
+      {/* <div className="flex flex-col md:flex-row items-center justify-center text-center gap-8 py-10 bg-[#272727]">
         <Button variant={"negative"}>BOOK NOW</Button>
-      </div>
+      </div> */}
 
       {/* Main Footer Content */}
       <div className="container mx-auto px-6 pt-12 grid grid-cols-1 md:grid-cols-4 gap-8">

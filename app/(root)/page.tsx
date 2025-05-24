@@ -69,41 +69,45 @@ export default function Home() {
           <b>All beard services Includes :</b> razor, styling 
         </p>
 
-        <div className="w-full overflow-x-auto">
-          <div className="flex flex-nowrap gap-2 w-fit">
-            <div className="w-64">
+        <div className="w-full overflow-x-auto flex justify-center">
+          <div className="flex flex-nowrap gap-4 px-4">
+            <div className="w-64 flex-shrink-0">
               <Image
                 src={"/assets/main-carousel-1.png"}
                 width={500}
                 height={500}
-                alt="Our Services 3d"
+                alt="Precision haircut service"
+                className="rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300"
               />
             </div>
 
-            <div className="w-64">
+            <div className="w-64 flex-shrink-0">
               <Image
                 src={"/assets/main-carousel-2.png"}
                 width={500}
                 height={500}
-                alt="Our Services 3d"
+                alt="Beard styling service"
+                className="rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300"
               />
             </div>
 
-            <div className="w-64">
+            <div className="w-64 flex-shrink-0">
               <Image
                 src={"/assets/main-carousel-3.png"}
                 width={500}
                 height={500}
-                alt="Our Services 3d"
+                alt="Hair washing service"
+                className="rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300"
               />
             </div>
 
-            <div className="w-64">
+            <div className="w-64 flex-shrink-0">
               <Image
                 src={"/assets/main-carousel-4.png"}
                 width={500}
                 height={500}
-                alt="Our Services 3d"
+                alt="Complete grooming service"
+                className="rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300"
               />
             </div>
           </div>
@@ -442,8 +446,8 @@ export default function Home() {
         <FAQSection />
       </section>
 
-      <section className="flex flex-col gap-8 px-4 mb-40 container mx-auto">
-        <h3>Join Our Gallery Of Successful Cuts.</h3>
+      <section className="flex flex-col items-center gap-8 px-4 mb-40 container mx-auto">
+        <h3 className="text-center">Join Our Gallery Of Successful Cuts.</h3>
 
         <p>
           Experience the real barbershop experience. Ultimate grooming with
@@ -459,12 +463,13 @@ export default function Home() {
           Book appointment
         </Button>
 
-        <div className="w-full">
+        <div className="w-full flex justify-center">
           <Image
             src={"/assets/main-8.png"}
             width={500}
             height={500}
-            alt="instance"
+            alt="Gallery of successful haircuts showcase"
+            className="rounded-xl shadow-lg"
           />
         </div>
       </section>

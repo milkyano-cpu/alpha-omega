@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import PhoneInput from "react-phone-number-input";
 import { isPossiblePhoneNumber } from "react-phone-number-input";
@@ -100,6 +100,25 @@ export function SignUpForm({
   });
 
   const { register } = useAuth();
+
+  // Check for data from main form on home page
+  useEffect(() => {
+    const quickSignupData = sessionStorage.getItem("quickSignupData");
+    if (quickSignupData) {
+      try {
+        const data = JSON.parse(quickSignupData);
+        // Pre-fill the form with data from main form
+        form.setValue("first_name", data.first_name || "");
+        form.setValue("last_name", data.last_name || "");
+        form.setValue("email", data.email || "");
+        form.setValue("password", data.password || "");
+        // Clear the data after using it
+        sessionStorage.removeItem("quickSignupData");
+      } catch (error) {
+        console.error("Error parsing quick signup data:", error);
+      }
+    }
+  }, [form]);
 
   async function onSubmit(values: SignUpFormValues) {
     setIsLoading(true);
