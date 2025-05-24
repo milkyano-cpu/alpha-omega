@@ -201,53 +201,68 @@ export default function ServiceSelection() {
       {/* Services Modal */}
       <Dialog open={showServicesModal} onOpenChange={setShowServicesModal}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden bg-white">
-          <DialogHeader className="border-b pb-4">
-            <DialogTitle className="text-2xl font-bold">
+          <DialogHeader className="border-b pb-3">
+            <DialogTitle className="text-xl font-bold">
               {selectedBarber
                 ? `${selectedBarber.first_name}'s Services`
                 : "Services"}
             </DialogTitle>
           </DialogHeader>
 
-          <div className="overflow-y-auto max-h-[calc(90vh-200px)] py-4">
+          <div className="overflow-y-auto max-h-[calc(90vh-200px)]">
             {selectedBarber && services[selectedBarber.id] ? (
-              <div className="grid gap-4">
-                {services[selectedBarber.id].map((service) => (
-                  <div
-                    key={service.id}
-                    className="border rounded-lg p-4 hover:border-gray-400 cursor-pointer transition-all"
-                    onClick={() => handleSelectService(service)}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-lg">
-                          {service.name}
-                        </h3>
-                        {service.description && (
-                          <p className="text-gray-600 text-sm mt-1">
-                            {service.description}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-4 mt-2">
-                          <span className="text-sm text-gray-500">
-                            Duration:{" "}
-                            {service.duration > 10000
-                              ? Math.round(service.duration / 60000)
-                              : service.duration}{" "}
-                            min
-                          </span>
+              <>
+                <div className="bg-gray-50 rounded-lg p-3 mb-3">
+                  <p className="text-xs text-gray-700 text-center">
+                    🎯 <strong>Limited Availability</strong> - Book your
+                    preferred time slot today!
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  {services[selectedBarber.id].map((service) => (
+                    <div
+                      key={service.id}
+                      className="border rounded-lg p-3 hover:border-black hover:shadow-md hover:bg-gray-50 active:scale-[0.98] cursor-pointer transition-all duration-150 group"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline gap-2 flex-wrap">
+                            <h3 className="font-semibold text-base group-hover:text-black transition-colors">
+                              {service.name}
+                            </h3>
+                            <span className="text-xs text-gray-500">
+                              {service.duration > 10000
+                                ? Math.round(service.duration / 60000)
+                                : service.duration}{" "}
+                              min
+                            </span>
+                          </div>
+                          {service.description && (
+                            <p className="text-gray-600 text-xs mt-1 line-clamp-1">
+                              {service.description}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="text-lg font-bold">
+                              ${(service.price_amount / 50).toFixed(2)}
+                            </p>
+                            <p className="text-xs text-gray-500">+15% Sun</p>
+                          </div>
+                          <Button
+                            onClick={() => handleSelectService(service)}
+                            size="sm"
+                            className="bg-black hover:bg-gray-800 active:bg-gray-900 text-white px-4 py-1.5 h-auto transition-all hover:scale-105 active:scale-95"
+                          >
+                            Book
+                          </Button>
                         </div>
                       </div>
-                      <div className="text-right ml-4">
-                        <p className="text-xl font-bold">
-                          ${(service.price_amount / 50).toFixed(2)}
-                        </p>
-                        <p className="text-xs text-gray-500">+15% on Sundays</p>
-                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </>
             ) : (
               <p className="text-center py-8 text-gray-500">
                 No services available
