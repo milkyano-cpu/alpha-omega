@@ -29,7 +29,8 @@ apiClient.interceptors.request.use(
   (config) => {
     // Only add token in browser environment
     if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token');
+      // Check both localStorage and sessionStorage for token
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token');
       if (token && config.headers) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -45,10 +46,12 @@ apiClient.interceptors.response.use(
   (error: AxiosError) => {
     // Check if error response indicates an expired token or unauthorized access
     if (error.response?.status === 401) {
-      // Clear token and user data
+      // Clear token and user data from both storage locations
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
       }
       
       // Redirect to login page
@@ -80,6 +83,9 @@ export const API = {
     
   put: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => 
     apiClient.put<T>(url, data, config).then(response => response.data),
+    
+  patch: <T = any>(url: string, data?: any, config?: AxiosRequestConfig) => 
+    apiClient.patch<T>(url, data, config).then(response => response.data),
     
   delete: <T = any>(url: string, config?: AxiosRequestConfig) => 
     apiClient.delete<T>(url, config).then(response => response.data),

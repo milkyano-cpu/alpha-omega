@@ -3,7 +3,7 @@ import Image from "next/image";
 
 export default function Home() {
   return (
-    <main className="flex flex-col gap-20">
+    <main className="flex flex-col gap-20 -mt-20">
       <section className="bg-[url('/bg/about-1.png')] bg-cover bg-center h-80 md:h-[600px] md:mt-20 flex flex-col justify-center items-center text-center text-white"></section>
 
       <section className="flex flex-col md:grid grid-cols-2 gap-8 px-4 md:w-4xl container mx-auto">
@@ -17,36 +17,66 @@ export default function Home() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <div className="bg-[#D9D9D9] rounded-xl aspect-square w-full" />
-          <h4>HOW IT BEGINS</h4>
+          <div className="bg-[#D9D9D9] rounded-xl aspect-square w-full flex justify-center items-center">
+            <Image
+              src={"/assets/ao-pixelate-black.png"}
+              width={300}
+              height={300}
+              alt=""
+            />
+          </div>
+          <h4 className="bg-gray-100 px-4 py-2 rounded-lg inline-block">
+            HOW IT BEGINS
+          </h4>
           <p>
-            {`
             Two years ago, I arrived in Australia from Greece with no money, a
-            dream in my heart and a determination to succeed. The journey was
-            far from easy — filled with challenges, long days of hard work, and
-            countless sacrifices. But through perseverance, dedication, and an
-            unwavering focus on my goals, I was able to turn my vision into
-            reality. None of this would have been possible without my
-            now-business partner. A Serbian native who grew up in Australia but
-            spent years living in Serbia, he brought a unique perspective to the
-            craft of barbering. When I first joined his barbershop, it was a
-            small operation with four barbers. Through endless discussions and a
+            dream in my heart and a determination to succeed.{" "}
+            <span className="bg-[#cccccc] text-black">
+              The journey was far from easy — filled with challenges, long days
+              of hard work, and countless sacrifices.
+            </span>{" "}
+            But through perseverance, dedication, and an unwavering focus on my
+            goals, I was able to turn my vision into reality.{" "}
+            <b>
+              <i>
+                None of this would have been possible without my now-business
+                partner
+              </i>
+            </b>
+            . A Serbian native who grew up in Australia but spent years living
+            in Serbia, he brought a unique perspective to the craft of
+            barbering. When I first joined his barbershop, it was a small
+            operation with four barbers. Through endless discussions and a
             shared passion for excellence, the business expanded and we grew
-            together. `}
+            together. 
           </p>
         </div>
 
         <div className="flex flex-col gap-2">
-          <div className="bg-[#D9D9D9] rounded-xl aspect-square w-full" />
-          <h4>WHY WE CREATES BARBERSHOP</h4>
+          <div className="bg-[#D9D9D9] rounded-xl aspect-square w-full flex justify-center items-center">
+            <Image
+              src={"/assets/ao-pixelate-black.png"}
+              width={300}
+              height={300}
+              alt=""
+            />
+          </div>
+          <h4 className="bg-gray-100 text-xl md:text-2xl px-4 py-2 rounded-lg inline-block">
+            WHY WE CREATE BARBERSHOP
+          </h4>
           <p>
-            {`
             As our collaboration grew stronger, we decided it was time to create
             something new - something that wasn’t existing - a space that would
-            redefine men’s grooming. Inspired by the fusion of traditional
-            barbering and modern luxury, we created a one of a kind environment
-            that blends premium services, innovative technology, and a stunning
-            interior designed to make every visit unforgettable `}
+            redefine men’s grooming.{" "}
+            <b>
+              <i>
+                {" "}
+                Inspired by the fusion of traditional barbering and modern
+                luxury, we created a one of a kind environment that blends
+                premium services, innovative technology, and a stunning interior
+                designed to make every visit unforgettable 
+              </i>
+            </b>
           </p>
         </div>
 

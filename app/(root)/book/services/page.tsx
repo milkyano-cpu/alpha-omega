@@ -2,16 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp } from "lucide-react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { BookingService, TeamMember, Service } from "@/lib/booking-service";
+import { preloadBarberImages } from "@/lib/barber-images";
+import { PlusCheckbox } from "@/components/plus-checkbox";
+import { VerificationGuard } from "@/components/verification-guard";
 
-export default function ServiceSelection() {
-  const [barbers, setBarbers] = useState<TeamMember[]>([]);
-  const [services, setServices] = useState<Record<number, Service[]>>({});
-  const [expandedBarber, setExpandedBarber] = useState<number | null>(null);
+function ServiceSelectionContent() {
+  const [services, setServices] = useState<Service[]>([]);
+  const [barbers, setBarbers] = useState<Record<number, TeamMember[]>>({});
+  const [selectedServices, setSelectedServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -24,41 +25,40 @@ export default function ServiceSelection() {
       return;
     }
 
-    // Fetch barbers and their services
+    // Fetch services and their barbers (reversed flow)
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const barberList = await BookingService.getTeamMembers();
-        setBarbers(barberList);
+        const serviceList = await BookingService.getAllServices();
+        setServices(serviceList);
 
-        // Auto-expand first barber if only one exists
-        if (barberList.length === 1) {
-          setExpandedBarber(barberList[0].id);
-        }
-
-        const servicesByBarber: Record<number, Service[]> = {};
-        for (const barber of barberList) {
+        const barbersByService: Record<number, TeamMember[]> = {};
+        for (const service of serviceList) {
           try {
-            const barberServices = await BookingService.getTeamMemberServices(
-              barber.id,
+            const serviceBarbers = await BookingService.getBarbersForService(
+              service.id,
             );
-            servicesByBarber[barber.id] = barberServices;
-          } catch (serviceErr) {
+            // Filter out barbers with is_owner=true
+            const availableBarbers = serviceBarbers.filter(
+              (barber) => !barber.is_owner,
+            );
+            barbersByService[service.id] = availableBarbers;
+          } catch (barberErr) {
             console.error(
-              `Failed to fetch services for barber ${barber.id}:`,
-              serviceErr,
+              `Failed to fetch barbers for service ${service.id}:`,
+              barberErr,
             );
           }
         }
 
-        setServices(servicesByBarber);
+        setBarbers(barbersByService);
       } catch (err) {
         setError(
           err instanceof Error
             ? err.message
-            : "Failed to load barbers and services",
+            : "Failed to load services and barbers",
         );
         console.error("Error fetching data:", err);
       } finally {
@@ -67,157 +67,285 @@ export default function ServiceSelection() {
     };
 
     fetchData();
+
+    // Preload barber images for better performance
+    preloadBarberImages();
   }, [isAuthenticated, router]);
 
-  const handleBookService = (barberId: number, service: Service) => {
-    localStorage.setItem("selectedService", JSON.stringify(service));
-    localStorage.setItem("selectedBarberId", barberId.toString());
-    router.push("/book/appointment");
+  const handleServiceToggle = (service: Service, checked: boolean) => {
+    setSelectedServices((prev) => {
+      if (checked) {
+        // Add service if not already selected
+        return prev.some((s) => s.id === service.id)
+          ? prev
+          : [...prev, service];
+      } else {
+        // Remove service if currently selected
+        return prev.filter((s) => s.id !== service.id);
+      }
+    });
   };
 
-  const toggleAccordion = (barberId: number) => {
-    setExpandedBarber(expandedBarber === barberId ? null : barberId);
+  const handleContinueToBarbers = () => {
+    if (selectedServices.length === 0) {
+      setError("Please select at least one service");
+      return;
+    }
+
+    // Store selected services and navigate to barbers page
+    localStorage.setItem("selectedServices", JSON.stringify(selectedServices));
+    // Use the first service ID for barber selection compatibility
+    router.push(`/book/barbers?serviceId=${selectedServices[0].id}`);
   };
 
-  // Calculate price range for services
-  const getPriceRange = (services: Service[]): string => {
-    if (!services || services.length === 0) return "$0 AUD";
-    const prices = services.map((s) => s.price_amount / 50);
-    const minPrice = Math.min(...prices);
-    const maxPrice = Math.max(...prices);
-    return minPrice === maxPrice
-      ? `$${minPrice} AUD`
-      : `$${minPrice}-$${maxPrice} AUD`;
+  const calculateTotalPrice = () => {
+    return selectedServices.reduce(
+      (total, service) => total + service.price_amount,
+      0,
+    );
+  };
+
+  const calculateTotalDuration = () => {
+    return selectedServices.reduce((total, service) => {
+      const duration =
+        service.duration > 10000
+          ? Math.round(service.duration / 60000)
+          : service.duration;
+      return total + duration;
+    }, 0);
   };
 
   if (isLoading) {
     return (
-      <main className="flex flex-col gap-20 mt-40">
-        <section className="container mx-auto text-center py-20">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4">Loading barbers and services...</p>
-        </section>
+      <main className="min-h-screen bg-white flex items-center justify-center px-4">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-gray-900 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <h2 className="mt-6 text-xl font-semibold text-gray-900">
+            Loading Services
+          </h2>
+          <p className="mt-2 text-gray-600">
+            Finding the best barbers for you...
+          </p>
+        </div>
       </main>
     );
   }
 
   if (error) {
     return (
-      <main className="flex flex-col gap-20 mt-40">
-        <section className="container mx-auto text-center py-20">
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-            <p>Error: {error}</p>
-            <Button onClick={() => window.location.reload()} className="mt-4">
-              Try Again
-            </Button>
+      <main className="min-h-screen bg-white flex items-center justify-center px-4">
+        <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg
+              className="w-8 h-8 text-red-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+              />
+            </svg>
           </div>
-        </section>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            Unable to Load Services
+          </h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <Button
+            onClick={() => window.location.reload()}
+            className="w-full bg-gray-900 hover:bg-gray-800"
+          >
+            Try Again
+          </Button>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="flex flex-col gap-20 mt-40">
-      {barbers.length === 0 ? (
-        <section className="container mx-auto text-center py-20">
-          <p>No barbers available at the moment. Please check back later.</p>
-        </section>
-      ) : (
-        barbers.map((barber) => (
-          <section
-            key={barber.id}
-            className="container mx-auto flex flex-col md:flex-row justify-center items-start py-10 gap-8 px-4"
-          >
-            <div className="w-full md:w-80">
-              <div className="rounded-lg overflow-hidden shadow-md">
-                <Image
-                  src={"/assets/barber-1.png"}
-                  width={500}
-                  height={500}
-                  alt={`${barber.first_name} ${barber.last_name}`}
-                  className="object-cover"
+    <VerificationGuard requireVerification={true}>
+      <main className="min-h-screen bg-white">
+      <div className="mx-auto px-4 py-6 pt-20 pb-32 mt-28">
+        {/* Header Section */}
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            Choose Your Services
+          </h1>
+          <p className="text-gray-600 text-sm max-w-md mx-auto">
+            Select one or more services you&apos;d like to book
+          </p>
+        </div>
+
+        {services.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm p-8 sm:p-12 text-center max-w-2xl mx-auto">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg
+                className="w-8 h-8 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
-              </div>
+              </svg>
             </div>
-
-            <div className="w-[1px] h-96 bg-[#D9D9D9] hidden md:block" />
-
-            <div className="flex flex-col gap-4 w-full md:w-1/3">
-              <h1 className="text-4xl md:text-5xl font-bold">
-                {barber.first_name} {barber.last_name}
-              </h1>
-              <p className="text-lg">
-                [IG@{barber.first_name.toLowerCase()}.barber]{" "}
-                <span className="ml-1">({barber.status})</span>
-              </p>
-              <div className="w-full h-[1px] bg-green-500" />
-
-              {/* Services Accordion */}
-              <div className="mt-4 max-w-md">
-                {/* Accordion Header */}
-                <button
-                  onClick={() => toggleAccordion(barber.id)}
-                  className="w-full flex justify-between items-center bg-[#333333] text-white rounded-lg p-4 hover:bg-[#3d3d3d] transition-colors"
-                  aria-expanded={expandedBarber === barber.id}
-                  aria-controls={`services-${barber.id}`}
-                >
-                  <div className="text-lg font-medium">
-                    View Services
-                    <span className="ml-2 text-gray-300 text-sm">
-                      ({getPriceRange(services[barber.id] || [])})
-                    </span>
-                  </div>
-                  {expandedBarber === barber.id ? (
-                    <ChevronUp className="h-5 w-5" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5" />
-                  )}
-                </button>
-
-                {/* Accordion Content */}
-                {expandedBarber === barber.id && (
-                  <div className="mt-4 space-y-4">
-                    {services[barber.id]?.length > 0 ? (
-                      services[barber.id].map((service) => (
-                        <div
-                          key={service.id}
-                          className="bg-[#111111] rounded-lg overflow-hidden mb-4"
-                        >
-                          <div className="p-4">
-                            <div className="flex flex-col md:flex-row justify-between gap-3">
-                              <div>
-                                <h3 className="font-bold text-lg text-white">
-                                  {service.name}
-                                </h3>
-                                <p className="text-gray-300 text-sm">
-                                  ${(service.price_amount / 50).toFixed(0)} +
-                                  [15% Surcharge On Sundays]
-                                </p>
-                              </div>
-                              <Button
-                                onClick={() =>
-                                  handleBookService(barber.id, service)
-                                }
-                                className="bg-green-600 hover:bg-green-700 text-white text-base px-6 py-2 rounded"
-                              >
-                                Book Now
-                              </Button>
-                            </div>
-                          </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              No Services Available
+            </h3>
+            <p className="text-gray-500">
+              No services are currently available. Please check back later or
+              contact us directly.
+            </p>
+          </div>
+        ) : (
+          <div className="max-w-md mx-auto space-y-3">
+            {services
+              .filter(
+                (service) =>
+                  barbers[service.id] && barbers[service.id].length > 0,
+              )
+              .map((service) => {
+                const isSelected = selectedServices.some(
+                  (s) => s.id === service.id,
+                );
+                return (
+                  <div
+                    key={service.id}
+                    className={`bg-white rounded-2xl border-2 transition-all duration-200 ${
+                      isSelected
+                        ? "border-gray-900 shadow-lg"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="p-4">
+                      {/* Service Header */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-gray-900 mb-1">
+                            {service.name}
+                          </h3>
+                          {service.description && (
+                            <p className="text-sm text-gray-600 leading-relaxed">
+                              {service.description}
+                            </p>
+                          )}
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-center py-4">
-                        No services available for this barber.
-                      </p>
-                    )}
+
+                        <PlusCheckbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) =>
+                            handleServiceToggle(service, checked)
+                          }
+                          className="ml-3 mt-1"
+                        />
+                      </div>
+
+                      {/* Service Details */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4 text-sm text-gray-600">
+                          {/* Price */}
+                          <div className="flex items-center gap-1">
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
+                              />
+                            </svg>
+                            <span className="font-semibold text-gray-900">
+                              ${(service.price_amount / 100).toFixed(2)}
+                            </span>
+                          </div>
+
+                          {/* Duration */}
+                          <div className="flex items-center gap-1">
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                              />
+                            </svg>
+                            <span>
+                              {service.duration > 10000
+                                ? Math.round(service.duration / 60000)
+                                : service.duration}{" "}
+                              min
+                            </span>
+                          </div>
+
+                          {/* Barber count */}
+                          {/* {barbers[service.id] && (
+                              <div className="flex items-center gap-1">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                                <span>
+                                 {barbers[service.id].length} barber{barbers[service.id].length !== 1 ? 's' : ''}
+                                </span>
+                              </div>
+                            )} */}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                )}
+                );
+              })}
+          </div>
+        )}
+
+        {/* Continue Button - Sticky Bottom */}
+        {selectedServices.length > 0 && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-2xl">
+            <div className="max-w-md mx-auto">
+              {/* Summary */}
+              <div className="flex justify-between items-center mb-3 text-sm">
+                <span className="text-gray-600">
+                  {selectedServices.length} service
+                  {selectedServices.length !== 1 ? "s" : ""} selected
+                </span>
+                <span className="font-semibold text-gray-900">
+                  ${(calculateTotalPrice() / 100).toFixed(2)} •{" "}
+                  {calculateTotalDuration()} min
+                </span>
               </div>
+
+              {/* Continue Button */}
+              <Button
+                onClick={handleContinueToBarbers}
+                className="w-full bg-gray-900 hover:bg-gray-800 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-200 text-base"
+              >
+                Continue
+                <span className="ml-2">→</span>
+              </Button>
             </div>
-          </section>
-        ))
-      )}
+          </div>
+        )}
+      </div>
     </main>
+    </VerificationGuard>
   );
+}
+
+export default function ServiceSelection() {
+  return <ServiceSelectionContent />;
 }

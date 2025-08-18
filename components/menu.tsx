@@ -43,7 +43,7 @@ export function Menu() {
           {isClient &&
             (isAuthenticated ? (
               <div className="flex items-center gap-4">
-                <span className="text-sm">
+                <span className="text-sm text-white">
                   Hello, {user?.first_name || "User"}
                 </span>
                 <button
@@ -70,7 +70,7 @@ export function Menu() {
             >
               <path
                 d="M24.4706 19.9413H7.5M24.4706 13.9706H7.5M24.4706 7.99994H7.5"
-                stroke="#000000"
+                stroke="white"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -105,6 +105,12 @@ export function Menu() {
                     <div className="mb-3 text-sm font-medium px-3">
                       Logged in as {user?.first_name || "User"}
                     </div>
+                    <ListItem href="/profile" title="PROFILE" />
+                    {/* Temporarily hidden - see DOCS/HIDDEN_MENU_ITEMS.md for details */}
+                    {/* <ListItem href="/my-bookings" title="MY BOOKINGS" /> */}
+                    {/* {user?.role === "admin" && (
+                      <ListItem href="/admin" title="ADMIN DASHBOARD" />
+                    )} */}
                     <li>
                       <NavigationMenuLink asChild>
                         <button

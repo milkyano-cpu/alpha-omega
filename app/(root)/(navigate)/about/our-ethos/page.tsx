@@ -1,4 +1,3 @@
-import { MainForm } from "@/components/main-form";
 import Image from "next/image";
 
 export default function Home() {
@@ -104,7 +103,7 @@ export default function Home() {
               />
             </svg>
 
-            <p>@InstagramHandle</p>
+            <p>@alpha.omega_mens.grooming</p>
           </div>
 
           <div className="flex gap-2">
@@ -157,7 +156,7 @@ export default function Home() {
               />
             </svg>
 
-            <p>61+ 0000 000 000</p>
+            <p>+61 03 9012 5480</p>
           </div>
 
           <div className="flex gap-2">
@@ -174,11 +173,9 @@ export default function Home() {
               />
             </svg>
 
-            <p>Email@gmail.com</p>
+            <p>alpha.omega.mens.grooming@gmail.com</p>
           </div>
         </div>
-
-        <MainForm />
       </section>
     </main>
   );

@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { SignUpForm } from "@/components/sign-up-form";
 
-export default function SignUp() {
+function SignUpContent() {
   return (
     <main className="flex flex-col gap-8 mt-5">
       <section className="flex flex-col gap-8 min-h-[calc(100vh-100px)] justify-center items-center px-4 py-12">
@@ -13,4 +13,8 @@ export default function SignUp() {
       </section>
     </main>
   );
+}
+
+export default function SignUp() {
+  return <SignUpContent />;
 }

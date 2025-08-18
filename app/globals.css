@@ -150,4 +150,78 @@
   a {
     @apply cursor-auto md:cursor-pointer;
   }
+
+  p {
+    @apply text-justify tracking-[-1px];
+  }
+}
+
+@layer utilities {
+  /* Z-index scale for proper layering */
+  .z-dropdown {
+    z-index: 1000;
+  }
+  .z-sticky {
+    z-index: 1020;
+  }
+  .z-fixed {
+    z-index: 1030;
+  }
+  .z-modal-backdrop {
+    z-index: 1040;
+  }
+  .z-modal {
+    z-index: 1050;
+  }
+  .z-popover {
+    z-index: 1060;
+  }
+  .z-tooltip {
+    z-index: 1070;
+  }
+  .z-navbar {
+    z-index: 1080;
+  }
+  .z-dialog-overlay {
+    z-index: 1090;
+  }
+  .z-dialog {
+    z-index: 1100;
+  }
+}
+
+@layer components {
+  /* Fix for rounded corner images - ensure container has overflow hidden */
+  .rounded-lg {
+    overflow: hidden;
+  }
+
+  .rounded-md {
+    overflow: hidden;
+  }
+
+  .rounded-xl {
+    overflow: hidden;
+  }
+
+  .rounded-2xl {
+    overflow: hidden;
+  }
+
+  .rounded-full {
+    overflow: hidden;
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 10s linear infinite;
 }

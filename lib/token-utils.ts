@@ -4,6 +4,17 @@
 import { jwtDecode } from "jwt-decode";
 import type { JwtPayload } from "jwt-decode";
 
+// Define the expected token payload structure
+export interface TokenPayload extends JwtPayload {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  verified: boolean;
+  role: string;
+}
+
 /**
  * Parse a JWT token and extract the payload
  * @param token JWT token string
@@ -66,5 +77,19 @@ export function getTokenRemainingTime(token: string): number {
   } catch (error) {
     console.error('Error calculating token remaining time:', error);
     return 0;
+  }
+}
+
+/**
+ * Decode a JWT token and extract user information
+ * @param token JWT token string
+ * @returns Decoded token payload with user information
+ */
+export function decodeToken(token: string): TokenPayload {
+  try {
+    return jwtDecode<TokenPayload>(token);
+  } catch (error) {
+    console.error('Error decoding JWT token:', error);
+    throw new Error('Invalid token');
   }
 }

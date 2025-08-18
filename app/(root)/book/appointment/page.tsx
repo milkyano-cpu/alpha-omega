@@ -1,686 +1,1016 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
-  AvailabilityResponse,
-  BookingService,
+  Service,
   TimeSlot,
+  BookingService,
+  AvailabilityResponse,
+  TeamMember,
 } from "@/lib/booking-service";
+import { StablePaymentForm } from "@/components/pages/appointment/StablePaymentForm";
 import {
   DateTimeSelector,
-  BookingSummary,
-  PaymentForm,
 } from "@/components/pages/appointment";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+import { MarqueeItems } from "@/components/navbar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { VerificationGuard } from "@/components/verification-guard";
 
-// Square type definitions are added globally in types/square.d.ts
-
-interface Service {
-  id: number;
-  team_member_id: number;
-  name: string;
-  description: string;
-  price_amount: number;
-  price_currency: string;
-  duration: number;
-  service_variation_id: string;
-  square_catalog_id: string;
+// Additional service interface
+interface AdditionalService {
+  service: Service;
+  barber: TeamMember;
+  timeSlot: TimeSlot;
 }
 
-export default function AppointmentBooking() {
-  // State related to availability and dates
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+function CleanAppointmentPageContent() {
+  const router = useRouter();
+  const { isAuthenticated } = useAuth();
+  
+  // Ref for payment section to enable auto-scroll on mobile
+  const paymentSectionRef = useRef<HTMLDivElement>(null);
+
+  // Core states
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [selectedServices, setSelectedServices] = useState<Service[]>([]);
+  const [selectedTime, setSelectedTime] = useState<TimeSlot | null>(null);
+  const [timeAutoSelected, setTimeAutoSelected] = useState(false);
+  // const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [bookingConfirmed, setBookingConfirmed] = useState(false);
+
+  // Availability states
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [availabilityData, setAvailabilityData] =
     useState<AvailabilityResponse | null>(null);
   const [availableTimes, setAvailableTimes] = useState<TimeSlot[]>([]);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // Cache for already fetched months - key is 'YYYY-MM'
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [monthCache, setMonthCache] = useState<
     Record<string, AvailabilityResponse>
   >({});
-  const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [selectedTime, setSelectedTime] = useState<TimeSlot | null>(null);
-  const [, setPaymentCompleted] = useState(false);
-  const [bookingConfirmed, setBookingConfirmed] = useState(false);
-  const [, setSquareBookingId] = useState<string | null>(null);
-  const router = useRouter();
-  const { isAuthenticated, user } = useAuth();
+  const [showManualTimeSelection, setShowManualTimeSelection] = useState(false);
 
-  // Square Payment SDK states
-  const [squareCard, setSquareCard] = useState<Square.Card | null>(null);
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
-  const [processingPayment, setProcessingPayment] = useState(false);
-  const [paymentError, setPaymentError] = useState<string | null>(null);
+  // Additional services states
+  const [additionalServices, setAdditionalServices] = useState<
+    AdditionalService[]
+  >([]);
+  const [showServiceDialog, setShowServiceDialog] = useState(false);
+  const [allServices, setAllServices] = useState<Service[]>([]);
+  const [allBarbers, setAllBarbers] = useState<Record<number, TeamMember[]>>(
+    {},
+  );
+  const [isLoadingServices, setIsLoadingServices] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isCreatingBooking, setIsCreatingBooking] = useState(false);
 
-  // Initialize Square payment form
-  useEffect(() => {
-    if (!showPaymentForm || !selectedService || !selectedTime) return;
-
-    const initializeSquarePayment = async () => {
-      if (!window.Square) {
-        console.error("Square.js failed to load");
-        setPaymentError(
-          "Payment system failed to load. Please try again later.",
-        );
-        return;
-      }
-
-      try {
-        // Initialize Square payments with app ID and location ID from environment variables
-        const appId = process.env.NEXT_PUBLIC_SQUARE_APP_ID || "";
-        const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || "";
-
-        if (!appId || !locationId) {
-          console.error("Missing Square credentials in environment variables");
-          setPaymentError(
-            "Payment system configuration error. Please contact support.",
-          );
-          return;
-        }
-
-        const payments = window.Square.payments(appId, locationId);
-
-        // Create a card payment method
-        const card = await payments.card();
-
-        // Attach the card payment form to the DOM
-        await card.attach("#card-container");
-
-        // Store the card instance for later use
-        setSquareCard(card);
-      } catch (e: any) {
-        console.error("Error initializing Square Payment:", e);
-        setPaymentError("Failed to initialize payment form. Please try again.");
-      }
-    };
-
-    initializeSquarePayment();
-
-    // Cleanup function
-    return () => {
-      if (squareCard) {
-        try {
-          squareCard.destroy();
-        } catch (e: any) {
-          console.error("Error destroying Square payment form:", e);
-        }
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showPaymentForm, selectedService, selectedTime]);
-
-  // Handle payment process
-  const handlePayment = async () => {
-    if (!squareCard || !selectedService) {
-      setPaymentError("Payment form not initialized properly");
-      return;
-    }
-
-    if (!user) {
-      setPaymentError(
-        "User information is not available. Please log in again.",
-      );
-      return;
-    }
-
-    if (!user.square_up_id) {
-      console.warn("User does not have a Square customer ID");
-      // We'll continue without it, but log a warning
-    }
-
-    setProcessingPayment(true);
-    setPaymentError(null);
-
-    try {
-      // The deposit amount is the actual price in Square
-      // This is 50% of the doubled price shown to customers
-      const depositAmount = selectedService.price_amount;
-      const formattedAmount = (depositAmount / 100).toFixed(2);
-
-      // Create a unique idempotency key for this transaction
-      // This will be used for both payment and booking to ensure consistency
-      const idempotencyKey = crypto.randomUUID();
-
-      // Prepare verification details
-      const verificationDetails = {
-        amount: formattedAmount,
-        currencyCode: "AUD",
-        intent: "CHARGE" as const, // Use type assertion to fix TypeScript error
-        billingContact: {
-          givenName: user.first_name || "",
-          familyName: user.last_name || "",
-          email: user.email || "",
-          countryCode: "AU",
-        },
-        customerInitiated: true,
-        sellerKeyedIn: false, // Adding the missing required field
-      };
-
-      // Tokenize the payment method
-      const tokenResult = await squareCard.tokenize(verificationDetails);
-
-      if (tokenResult.status === "OK") {
-        // Process the payment with the token
-        const paymentResponse = await fetch("/api/process-payment", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            sourceId: tokenResult.token,
-            amount: depositAmount,
-            idempotencyKey: idempotencyKey,
-            locationId: process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID || "",
-            // Pass customer details for the payment
-            customerDetails: {
-              squareCustomerId: user.square_up_id,
-            },
-          }),
-        });
-
-        if (paymentResponse.ok) {
-          // Payment successful
-          const paymentData = await paymentResponse.json();
-
-          // Store payment details for booking notes and receipt
-          const paymentInfo = {
-            receiptUrl: paymentData.payment?.receiptUrl,
-            paymentId: paymentData.payment?.id,
-            amount: formattedAmount,
-            currency: "AUD",
-            idempotencyKey: idempotencyKey,
-          };
-
-          localStorage.setItem("paymentReceipt", JSON.stringify(paymentInfo));
-
-          setPaymentCompleted(true);
-
-          // Immediately create the booking in Square after successful payment
-          await createBookingInSquare(idempotencyKey, paymentInfo);
-        } else {
-          const errorData = await paymentResponse.json();
-          throw new Error(errorData.message || "Payment processing failed");
-        }
-      } else {
-        console.log("tokenResult.errors", tokenResult);
-        throw new Error(
-          `Tokenization failed: ${
-            tokenResult.errors?.[0]?.detail || tokenResult.status
-          }`,
-        );
-      }
-    } catch (error: any) {
-      console.error("Payment error:", error);
-      setPaymentError(
-        error instanceof Error ? error.message : "Payment processing failed",
-      );
-      setProcessingPayment(false);
-    }
-  };
-
-  // Create booking in Square directly after payment
-  const createBookingInSquare = async (
-    idempotencyKey: string,
-    paymentInfo: any,
-  ) => {
-    if (!selectedService || !selectedTime || !user) {
-      console.error("Missing required booking information");
-      setError("Missing required booking information for booking");
-      setProcessingPayment(false);
-      return;
-    }
-
-    try {
-      // Get service variation version from the appointment segments
-      const serviceVariationVersion =
-        selectedTime.appointment_segments?.[0]?.service_variation_version;
-
-      // Create customer note with payment details
-      const customerNote =
-        `50% deposit of ${paymentInfo.amount} ${paymentInfo.currency} paid via Square payment (ID: ${paymentInfo.paymentId}).\n` +
-        `Receipt: ${paymentInfo.receiptUrl || "Not available"}\n` +
-        `Remaining balance to be paid at appointment.`;
-
-      // Create booking directly in Square
-      const squareResponse = await BookingService.createSquareBooking({
-        serviceVariationId: selectedService.service_variation_id,
-        teamMemberId:
-          selectedTime.appointment_segments?.[0]?.team_member_id ||
-          `${selectedService.team_member_id}`,
-        customerId: user.square_up_id,
-        startAt: selectedTime.start_at,
-        serviceVariationVersion,
-        customerNote,
-        idempotencyKey,
-        locationId:
-          selectedTime.location_id ||
-          process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID ||
-          "",
-      });
-
-      // Store the Square booking ID to use in backend sync
-      if (squareResponse.booking?.id) {
-        setSquareBookingId(squareResponse.booking.id);
-
-        // Update payment receipt with booking ID
-        const receiptData = JSON.parse(
-          localStorage.getItem("paymentReceipt") || "{}",
-        );
-        localStorage.setItem(
-          "paymentReceipt",
-          JSON.stringify({
-            ...receiptData,
-            squareBookingId: squareResponse.booking.id,
-          }),
-        );
-
-        // Attempt to sync with our backend - but don't wait for it
-        syncWithBackend(
-          idempotencyKey,
-          squareResponse.booking.id,
-          customerNote,
-        );
-
-        // Mark booking as confirmed and handle UI transitions
-        setBookingConfirmed(true);
-        setProcessingPayment(false);
-
-        // Save booking details for thank you page
-        saveBookingDetails(squareResponse);
-      }
-    } catch (error: any) {
-      console.error("Error creating Square booking:", error);
-
-      // Don't show error to user - we'll still try to sync with backend
-      // This ensures smoother user experience even if there are issues
-      setProcessingPayment(false);
-
-      // Try backend sync anyway - it might use a different approach
-      syncWithBackend(idempotencyKey);
-    }
-  };
-
-  // Sync booking with our backend system - don't block user flow on this
-  const syncWithBackend = async (
-    idempotencyKey: string,
-    squareBookingId?: string,
-    customerNote?: string,
-  ) => {
-    if (!selectedService || !selectedTime || !user) return;
-
-    try {
-      // If we have a Square booking ID, sync it with our backend
-      // But don't wait for response or block UI flow
-      BookingService.syncBookingWithBackend(
-        {
-          service_variation_id: selectedService.service_variation_id,
-          team_member_id: selectedService.team_member_id.toString(),
-          start_at: selectedTime.start_at,
-          service_variation_version:
-            selectedTime.appointment_segments?.[0]?.service_variation_version,
-          customer_note: customerNote,
-          idempotencyKey,
-        },
-        squareBookingId,
-      )
-        .then((response) => {
-          // Handle successful backend sync
-          if (response?.data?.id) {
-            // Update the booking ID in localStorage
-            const bookingData = JSON.parse(
-              localStorage.getItem("lastBooking") || "{}",
-            );
-            localStorage.setItem(
-              "lastBooking",
-              JSON.stringify({
-                ...bookingData,
-                id: response.data.id,
-                square_booking_id: response.data.square_booking_id,
-                backend_synced: true,
-              }),
-            );
-          }
-        })
-        .catch((error) => {
-          // Log error but don't disrupt user flow
-          console.error("Error syncing with backend:", error);
-        });
-
-      // Redirect to thank you page after a short delay
-      setTimeout(() => {
-        // Clean up sensitive data
-        localStorage.removeItem("selectedService");
-        localStorage.removeItem("selectedBarberId");
-
-        // Redirect to confirmation page
-        router.push("/book/thank-you");
-      }, 500);
-    } catch (error) {
-      console.error("Error in backend sync:", error);
-      // Still redirect user to thank you page - Square booking is confirmed
-      setTimeout(() => router.push("/book/thank-you"), 500);
-    }
-  };
-
-  // Save booking details for thank you page
-  const saveBookingDetails = (squareResponse: any) => {
-    if (!selectedService || !selectedTime) return;
-
-    try {
-      localStorage.setItem(
-        "lastBooking",
-        JSON.stringify({
-          id: squareResponse.booking?.id || "pending",
-          square_booking_id: squareResponse.booking?.id,
-          service: selectedService.name,
-          date: new Date(selectedTime.start_at).toLocaleDateString(),
-          time: new Date(selectedTime.start_at).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          deposit: (selectedService.price_amount / 100).toFixed(2), // 50% of the price of double amount
-          total: (selectedService.price_amount / 50).toFixed(2),
-          status: squareResponse.booking?.status || "confirmed",
-          square_confirmed: true,
-          backend_synced: false,
-        }),
-      );
-    } catch (error) {
-      console.error("Error saving booking details:", error);
-    }
-  };
-
-  // Load selected service from localStorage
+  // Redirect if not authenticated
   useEffect(() => {
     if (!isAuthenticated) {
-      router.push("/login?returnUrl=/book/services");
+      router.push("/login");
       return;
-    }
-
-    const serviceData = localStorage.getItem("selectedService");
-    if (!serviceData) {
-      // No service selected, redirect back to services page
-      router.push("/book/services");
-      return;
-    }
-
-    try {
-      const parsedService = JSON.parse(serviceData) as Service;
-      setSelectedService(parsedService);
-    } catch (err: any) {
-      console.error("Error parsing selected service:", err);
-      router.push("/book/services");
     }
   }, [isAuthenticated, router]);
 
-  // Fetch available times when date changes
-  // Fetch availability data when month changes or service changes
+  // Load selected services from localStorage
   useEffect(() => {
-    if (!selectedService) return;
+    if (!isAuthenticated) return;
 
-    // Extract month and year for dependency tracking and caching
-    const currentMonth = selectedDate.getMonth();
-    const currentYear = selectedDate.getFullYear();
-    const cacheKey = `${currentYear}-${currentMonth}`;
-
-    const fetchAvailabilityData = async () => {
-      // Check if we already have this month in cache
-      if (monthCache[cacheKey]) {
-        console.log(`Using cached data for ${cacheKey}`);
-        // Use cached data
-        const cachedData = monthCache[cacheKey];
-        setAvailabilityData(cachedData);
-
-        // Extract available dates from cached data
-        const dates = Object.keys(cachedData.availabilities_by_date);
-        setAvailableDates(dates);
-
-        // Update time slots for selected date
-        const dateKey = selectedDate.toISOString().split("T")[0];
-        const availabilities = cachedData.availabilities_by_date[dateKey] || [];
-
-        // Sort times chronologically
-        availabilities.sort(
-          (a, b) =>
-            new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
-        );
-
-        setAvailableTimes(availabilities);
+    // Load selected services
+    const servicesData = localStorage.getItem("selectedServices");
+    if (servicesData) {
+      try {
+        const services = JSON.parse(servicesData);
+        console.log("Loading selected services:", services);
+        setSelectedServices(services);
+        setSelectedService(services[0] || null);
+      } catch (err) {
+        console.error("Error parsing selected services:", err);
+        router.push("/book/services");
         return;
       }
+    } else {
+      console.log("No selected services found, redirecting to services");
+      router.push("/book/services");
+      return;
+    }
 
-      // If not in cache, fetch new data
-      setIsLoading(true);
+    // Check for auto-selected time from closest-time barber selection
+    const autoSelectedTimeFlag = localStorage.getItem("autoSelectedTime");
+    const selectedBarberId = localStorage.getItem("selectedBarberId");
+    const rescheduleBookingId = localStorage.getItem("rescheduleBookingId");
+
+    if (autoSelectedTimeFlag === "true") {
+      const savedTimeSlot = localStorage.getItem("selectedTimeSlot");
+      if (savedTimeSlot) {
+        try {
+          const parsedTimeSlot = JSON.parse(savedTimeSlot);
+          console.log("Loading auto-selected time slot:", parsedTimeSlot);
+
+          setSelectedTime(parsedTimeSlot);
+          setTimeAutoSelected(true);
+          // setShowPaymentForm(true); // Commented since showPaymentForm is not used
+
+          // Update selectedDate to match the auto-selected time's date
+          if (parsedTimeSlot.start_at) {
+            const autoSelectedDate = new Date(parsedTimeSlot.start_at);
+            setSelectedDate(autoSelectedDate);
+            console.log(
+              "Updated selectedDate to match auto-selected time:",
+              autoSelectedDate.toISOString(),
+            );
+          }
+
+          // Clean up the auto-selection flags
+          localStorage.removeItem("selectedTimeSlot");
+          localStorage.removeItem("autoSelectedTime");
+        } catch (err) {
+          console.error("Error parsing auto-selected time slot:", err);
+          localStorage.removeItem("selectedTimeSlot");
+          localStorage.removeItem("autoSelectedTime");
+        }
+      }
+    } else if (rescheduleBookingId) {
+      // Reschedule scenario - always show manual time selection
+      console.log(
+        "Reschedule detected, enabling manual time selection",
+        {
+          rescheduleBookingId,
+        },
+      );
+      setShowManualTimeSelection(true);
+    } else if (selectedBarberId && autoSelectedTimeFlag !== "true") {
+      // Manual barber selection - show manual time selection immediately
+      console.log(
+        "Manual barber selection detected, enabling manual time selection",
+        {
+          selectedBarberId,
+          autoSelectedTimeFlag,
+        },
+      );
+      setShowManualTimeSelection(true);
+    } else {
+      console.log("No manual selection triggered", {
+        hasSelectedBarberId: !!selectedBarberId,
+        autoSelectedTimeFlag,
+        hasRescheduleId: !!rescheduleBookingId,
+      });
+    }
+  }, [isAuthenticated, router]);
+
+  // Handle booking confirmation
+  useEffect(() => {
+    if (bookingConfirmed) {
+      // Clear localStorage
+      localStorage.removeItem("selectedServices");
+      localStorage.removeItem("selectedService");
+      localStorage.removeItem("selectedBarberId");
+      localStorage.removeItem("rescheduleBookingId");
+
+      // Clear additional services
+      setAdditionalServices([]);
+
+      // Redirect to thank you page
+      setTimeout(() => {
+        router.push("/book/thank-you");
+      }, 400);
+    }
+  }, [bookingConfirmed, router]);
+
+  // Fetch availability when service changes or when manual selection is requested
+  useEffect(() => {
+    console.log("🔍 Availability useEffect check:", {
+      selectedService: !!selectedService,
+      showManualTimeSelection,
+      serviceVariationId: selectedService?.service_variation_id,
+    });
+
+    if (!selectedService || !showManualTimeSelection) {
+      console.log("⏭️ Skipping availability fetch:", {
+        noService: !selectedService,
+        noManualSelection: !showManualTimeSelection,
+      });
+      return;
+    }
+
+    const fetchAvailabilityData = async () => {
+      setIsLoadingAvailability(true);
       setError(null);
 
       try {
-        // Calculate date range
-        // If we're in the current month, start from today
-        // Otherwise, start from the 1st of the month
-        const now = new Date();
-        const isCurrentMonth =
-          now.getMonth() === currentMonth && now.getFullYear() === currentYear;
+        const selectedMonth = selectedDate.getMonth() + 1;
+        const selectedYear = selectedDate.getFullYear();
+        const cacheKey = `${selectedYear}-${String(selectedMonth).padStart(
+          2,
+          "0",
+        )}`;
 
-        // Start date - either today or 1st of month
-        const startDate = isCurrentMonth
-          ? new Date(now.setHours(0, 0, 0, 0))
-          : new Date(currentYear, currentMonth, 1);
+        // Check cache first
+        if (monthCache[cacheKey]) {
+          console.log(`Using cached availability data for ${cacheKey}`);
+          const cachedData = monthCache[cacheKey];
+          setAvailabilityData(cachedData);
 
-        // End date - last day of the month
-        const endDate = new Date(currentYear, currentMonth + 1, 0);
-        endDate.setHours(23, 59, 59, 999);
+          // Extract available dates
+          const dates = Object.keys(cachedData.availabilities_by_date || {});
+          setAvailableDates(dates);
 
-        console.log(
-          `Fetching availability for ${cacheKey} from`,
-          startDate.toISOString(),
-          "to",
-          endDate.toISOString(),
+          // Update time slots for selected date
+          const dateKey = dayjs(selectedDate).format("YYYY-MM-DD");
+          const availabilities =
+            cachedData.availabilities_by_date?.[dateKey] || [];
+          availabilities.sort(
+            (a, b) =>
+              new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
+          );
+          setAvailableTimes(availabilities);
+          return;
+        }
+
+        // Fetch new data - get full month range, but only future dates
+        console.log("Raw date inputs:", { selectedYear, selectedMonth });
+
+        // Create dates in UTC to avoid timezone conversion issues
+        // But ensure startDate is not in the past - Square only allows future bookings
+        const today = new Date();
+        const todayUTC = new Date(
+          Date.UTC(
+            today.getFullYear(),
+            today.getMonth(),
+            today.getDate(),
+            0,
+            0,
+            0,
+            0,
+          ),
         );
 
-        // Make a single request for the entire date range
-        const response = await BookingService.searchAvailability(
+        const monthStart = new Date(
+          Date.UTC(selectedYear, selectedMonth - 1, 1, 0, 0, 0, 0),
+        );
+        const startDate = monthStart < todayUTC ? todayUTC : monthStart;
+        const endDate = new Date(
+          Date.UTC(selectedYear, selectedMonth, 0, 23, 59, 59, 999),
+        );
+
+        console.log("UTC dates created:", {
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+        });
+
+        console.log("Date calculation debug:", {
+          selectedDate: selectedDate.toISOString(),
+          selectedMonth,
+          selectedYear,
+          today: today.toISOString(),
+          todayUTC: todayUTC.toISOString(),
+          monthStart: monthStart.toISOString(),
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+        });
+
+        console.log(
+          `Fetching availability for ${
+            selectedService.service_variation_id
+          } from ${startDate.toISOString()} to ${endDate.toISOString()}`,
+        );
+
+        const data = await BookingService.searchAvailability(
           selectedService.service_variation_id,
           startDate,
           endDate,
         );
 
-        // Store the response in cache
-        setMonthCache((prev) => ({
-          ...prev,
-          [cacheKey]: response,
-        }));
-
-        // Update state with response data
-        setAvailabilityData(response);
+        // Cache the result
+        setMonthCache((prev) => ({ ...prev, [cacheKey]: data }));
+        setAvailabilityData(data);
 
         // Extract available dates
-        const dates = Object.keys(response.availabilities_by_date);
-        console.log(`${cacheKey} available dates:`, dates);
+        const dates = Object.keys(data.availabilities_by_date || {});
         setAvailableDates(dates);
 
-        // If the selected date has available times, set them
-        const dateKey = selectedDate.toISOString().split("T")[0];
-        const availabilities = response.availabilities_by_date[dateKey] || [];
-
-        // Sort times chronologically
+        // Update time slots for selected date
+        const dateKey = dayjs(selectedDate).format("YYYY-MM-DD");
+        const availabilities = data.availabilities_by_date?.[dateKey] || [];
         availabilities.sort(
           (a, b) =>
             new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
         );
-
         setAvailableTimes(availabilities);
       } catch (err: any) {
         console.error("Error fetching availability:", err);
-        setError(
-          err instanceof Error ? err.message : "Failed to load availability",
-        );
+        setError("Failed to load available time slots. Please try again.");
       } finally {
-        setIsLoading(false);
+        setIsLoadingAvailability(false);
       }
     };
 
     fetchAvailabilityData();
-    // We need to disable ESLint for this complex dependency because we're checking specific parts of selectedDate
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    selectedDate.getMonth(),
-    selectedDate.getFullYear(),
-    selectedService,
-    monthCache,
-  ]);
+  }, [selectedService, selectedDate, showManualTimeSelection, monthCache]);
 
   // Update available times when selected date changes
   useEffect(() => {
-    if (!availabilityData) return;
+    if (!availabilityData || !showManualTimeSelection) return;
 
-    // Get the key for the selected date
-    const dateKey = selectedDate.toISOString().split("T")[0];
-
-    // Get available times for this date from the existing data
+    const dateKey = dayjs(selectedDate).format("YYYY-MM-DD");
     const availabilities =
-      availabilityData.availabilities_by_date[dateKey] || [];
-
-    // Sort times chronologically
+      availabilityData.availabilities_by_date?.[dateKey] || [];
     availabilities.sort(
       (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime(),
     );
-
-    console.log(
-      `Found ${availabilities.length} available slots for ${dateKey}`,
-    );
     setAvailableTimes(availabilities);
-    setSelectedTime(null); // Reset selected time when date changes
-  }, [availabilityData, selectedDate]);
+  }, [selectedDate, availabilityData, showManualTimeSelection]);
 
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
-    setSelectedTime(null); // Reset selected time when date changes
-  };
-
-  // Handle month changes from the calendar
-  const handleMonthChange = (date: Date) => {
-    console.log("Month changed to:", date);
-    // Clear any previously selected time
     setSelectedTime(null);
-
-    // Create cache key for the target month
-    const targetMonth = date.getMonth();
-    const targetYear = date.getFullYear();
-    const cacheKey = `${targetYear}-${targetMonth}`;
-
-    // Check if month data is already in cache
-    const isCached = !!monthCache[cacheKey];
-
-    // Only show loading state if we need to fetch
-    if (!isCached) {
-      // Reset available times until we get new data
-      setAvailableTimes([]);
-      console.log(`No cached data for ${cacheKey}, will fetch`);
-    } else {
-      console.log(`Found cached data for ${cacheKey}, no need to fetch`);
-    }
-
-    // Update selectedDate to the first day of the new month
-    const newMonthDate = new Date(date.getFullYear(), date.getMonth(), 1);
-    setSelectedDate(newMonthDate);
+    setAdditionalServices([]); // Clear additional services when date changes
   };
 
-  const handleTimeSelection = (time: any) => {
+  const handleMonthChange = (date: Date) => {
+    setSelectedDate(date);
+  };
+
+  const handleTimeSelection = (time: TimeSlot | null) => {
     setSelectedTime(time);
+    setTimeAutoSelected(false);
+    // Note: Don't clear additional services here - they'll be recalculated by useEffect
   };
 
-  // Show payment form
-  const handleShowPaymentForm = () => {
-    if (!selectedService || !selectedTime || !user) {
-      setError("Please select a service and time first");
+  // Auto-scroll to payment section on mobile when time is selected
+  useEffect(() => {
+    if (selectedTime && paymentSectionRef.current) {
+      // Check if we're on mobile (screen width < 1024px, which is lg breakpoint)
+      const isMobile = window.innerWidth < 1024;
+      
+      if (isMobile) {
+        // Small delay to ensure the payment form is rendered
+        setTimeout(() => {
+          paymentSectionRef.current?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+            inline: 'nearest'
+          });
+        }, 300);
+      }
+    }
+  }, [selectedTime]);
+
+  // const handleShowPaymentForm = () => {
+  //   if (!selectedService || !selectedTime || !user) {
+  //     setError("Please select a service and time first");
+  //     return;
+  //   }
+  //   setShowPaymentForm(true);
+  // };
+
+  // Recalculate additional service times when main service time changes
+  useEffect(() => {
+    if (!selectedTime || !selectedService) {
       return;
     }
-    setShowPaymentForm(true);
+
+    setAdditionalServices((currentServices) => {
+      if (currentServices.length === 0) {
+        return currentServices;
+      }
+
+      console.log(
+        "Main service time changed, recalculating additional service times...",
+      );
+
+      const recalculatedServices = currentServices.map(
+        (additionalService, index) => {
+          let calculatedStartTime: Date;
+
+          if (index === 0) {
+            calculatedStartTime = new Date(selectedTime.start_at);
+            const mainServiceDuration =
+              selectedService.duration > 10000
+                ? selectedService.duration / 60000
+                : selectedService.duration;
+            calculatedStartTime.setMinutes(
+              calculatedStartTime.getMinutes() + mainServiceDuration,
+            );
+          } else {
+            const previousService = currentServices[index - 1];
+            calculatedStartTime = new Date(previousService.timeSlot.start_at);
+            const previousDuration =
+              previousService.service.duration > 10000
+                ? previousService.service.duration / 60000
+                : previousService.service.duration;
+            calculatedStartTime.setMinutes(
+              calculatedStartTime.getMinutes() + previousDuration,
+            );
+          }
+
+          // Apply 30-minute rounding
+          const minutes = calculatedStartTime.getMinutes();
+          const remainder = minutes % 30;
+          if (remainder !== 0) {
+            calculatedStartTime.setMinutes(minutes + (30 - remainder));
+          }
+
+          const newTimeSlot = {
+            ...additionalService.timeSlot,
+            start_at: calculatedStartTime.toISOString(),
+          };
+
+          console.log(
+            `Recalculated ${additionalService.service.name} to: ${dayjs(
+              calculatedStartTime,
+            )
+              .tz("Australia/Melbourne")
+              .format("h:mm A")}`,
+          );
+
+          return {
+            ...additionalService,
+            timeSlot: newTimeSlot,
+          };
+        },
+      );
+
+      return recalculatedServices;
+    });
+  }, [selectedTime, selectedService]);
+
+  // Additional service handlers
+  const handleAddAdditionalService = async () => {
+    if (!selectedTime || !selectedService) {
+      setError("Please select a main service and time first");
+      return;
+    }
+
+    try {
+      setIsLoadingServices(true);
+      setError(null);
+      console.log(
+        "Fetching services and barbers for additional service dialog...",
+      );
+
+      const serviceList = await BookingService.getAllServices();
+      console.log(
+        `Fetched ${serviceList.length} services:`,
+        serviceList.map((s) => s.name),
+      );
+      setAllServices(serviceList);
+
+      const barbersByService: Record<number, TeamMember[]> = {};
+      for (const service of serviceList) {
+        try {
+          const serviceBarbers = await BookingService.getBarbersForService(
+            service.id,
+          );
+          const availableBarbers = serviceBarbers.filter(
+            (barber) => !barber.is_owner,
+          );
+          barbersByService[service.id] = availableBarbers;
+          console.log(
+            `Service ${service.name}: ${availableBarbers.length} available barbers`,
+          );
+        } catch (err) {
+          console.error(
+            `Failed to fetch barbers for service ${service.id} (${service.name}):`,
+            err,
+          );
+          barbersByService[service.id] = [];
+        }
+      }
+
+      console.log(
+        "All barbers by service:",
+        Object.keys(barbersByService).map(
+          (id) =>
+            `${serviceList.find((s) => s.id === parseInt(id))?.name}: ${
+              barbersByService[parseInt(id)].length
+            } barbers`,
+        ),
+      );
+
+      setAllBarbers(barbersByService);
+      setShowServiceDialog(true);
+    } catch (error) {
+      console.error("Error fetching services:", error);
+      setError("Failed to load services. Please try again.");
+    } finally {
+      setIsLoadingServices(false);
+    }
   };
 
-  if (!selectedService) {
-    return (
-      <main className="flex flex-col gap-3 mt-20">
-        <section className="container mx-auto text-center py-16">
-          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4">Loading service information...</p>
-        </section>
-      </main>
+  const handleSelectAdditionalService = async (service: Service) => {
+    console.log(
+      "🚀 handleSelectAdditionalService called with service:",
+      service.name,
     );
-  }
 
-  // Rendering different states based on booking flow
+    if (!selectedTime || !selectedService) {
+      setError("Please select a main service and time first");
+      return;
+    }
+
+    const mainBarber = selectedTime.appointment_segments?.[0]?.team_member_id;
+    console.log("Main barber ID from selectedTime:", mainBarber);
+
+    if (!mainBarber) {
+      setError("Cannot determine main service barber");
+      return;
+    }
+
+    console.log("allBarbers structure:", allBarbers);
+    const flattenedBarbers = Object.values(allBarbers).flat();
+    console.log("Flattened barbers count:", flattenedBarbers.length);
+
+    let barberObj = flattenedBarbers.find(
+      (barber) =>
+        barber.square_up_id === mainBarber || barber.square_up_id == mainBarber,
+    );
+
+    if (!barberObj) {
+      try {
+        console.log(
+          `Main barber (${mainBarber}) not found in allBarbers, fetching all team members...`,
+        );
+        const allTeamMembers = await BookingService.getTeamMembers();
+        console.log(`Fetched ${allTeamMembers.length} team members from API`);
+
+        barberObj = allTeamMembers.find(
+          (barber) =>
+            barber.square_up_id === mainBarber ||
+            barber.square_up_id == mainBarber,
+        );
+
+        if (!barberObj) {
+          console.error(
+            `Main barber with ID ${mainBarber} not found in ${allTeamMembers.length} team members`,
+          );
+          setError("Main service barber not found");
+          return;
+        }
+        console.log(
+          `Found main barber: ${barberObj.first_name} (${barberObj.square_up_id})`,
+        );
+      } catch (error) {
+        console.error("Error fetching team members:", error);
+        setError("Failed to load barber information");
+        return;
+      }
+    }
+
+    try {
+      // Calculate when the LAST added service ends
+      let lastServiceEndTime;
+
+      if (additionalServices.length === 0) {
+        lastServiceEndTime = new Date(selectedTime.start_at);
+        const mainServiceDuration =
+          selectedService.duration > 10000
+            ? selectedService.duration / 60000
+            : selectedService.duration;
+        lastServiceEndTime.setMinutes(
+          lastServiceEndTime.getMinutes() + mainServiceDuration,
+        );
+      } else {
+        const lastAddedService =
+          additionalServices[additionalServices.length - 1];
+        lastServiceEndTime = new Date(lastAddedService.timeSlot.start_at);
+        const lastServiceDuration =
+          lastAddedService.service.duration > 10000
+            ? lastAddedService.service.duration / 60000
+            : lastAddedService.service.duration;
+        lastServiceEndTime.setMinutes(
+          lastServiceEndTime.getMinutes() + lastServiceDuration,
+        );
+      }
+
+      // Round up to next 30-minute increment
+      const minutes = lastServiceEndTime.getMinutes();
+      const remainder = minutes % 30;
+      if (remainder !== 0) {
+        lastServiceEndTime.setMinutes(minutes + (30 - remainder));
+      }
+
+      console.log(
+        `Last service ends at: ${dayjs(lastServiceEndTime)
+          .tz("Australia/Melbourne")
+          .format("h:mm A")}`,
+      );
+
+      // Create the assigned time slot
+      const assignedTimeSlot = {
+        start_at: lastServiceEndTime.toISOString(),
+        location_id: selectedTime.location_id,
+        appointment_segments: [
+          {
+            team_member_id: mainBarber,
+            service_variation_id: service.service_variation_id,
+            duration_minutes:
+              service.duration > 10000
+                ? Math.round(service.duration / 60000)
+                : service.duration,
+            service_variation_version: 1,
+          },
+        ],
+      };
+
+      const newAdditionalService: AdditionalService = {
+        service: service,
+        barber: barberObj,
+        timeSlot: assignedTimeSlot,
+      };
+
+      setAdditionalServices((prev) => [...prev, newAdditionalService]);
+      setShowServiceDialog(false);
+    } catch (error) {
+      console.error("Error adding additional service:", error);
+      setError("Failed to add additional service. Please try again.");
+    }
+  };
+
+  // const handleRemoveAdditionalService = (index: number) => {
+  //   setAdditionalServices((prev) => prev.filter((_, i) => i !== index));
+  // };
+
+  const handlePaymentStateChange = (processingPayment: boolean, creatingBooking: boolean) => {
+    setIsProcessingPayment(processingPayment);
+    setIsCreatingBooking(creatingBooking);
+  };
+
   const renderBookingStatus = () => {
-    if (bookingConfirmed) {
+    if (timeAutoSelected && selectedTime) {
       return (
-        <div className="p-3 bg-green-100 border border-green-300 rounded-lg mb-3 text-sm">
-          <p className="text-green-800 font-medium">
-            <svg
-              className="inline-block w-5 h-5 mr-1 -mt-1"
-              viewBox="0 0 20 20"
-              fill="currentColor"
+        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="font-medium text-green-800">
+                Closest Available Time Selected
+              </p>
+              <p className="text-sm text-green-600 mt-1">
+                Your appointment is automatically selected for the earliest
+                available time
+              </p>
+              <div className="mt-2 p-2 bg-white rounded border">
+                <p className="text-sm font-medium">
+                  {dayjs(selectedTime.start_at).format("dddd, MMMM D, YYYY")} at{" "}
+                  {dayjs(selectedTime.start_at).format("h:mm A")}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center mt-3">
+            <button
+              onClick={() => router.push("/book/barbers")}
+              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
             >
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                clipRule="evenodd"
-              />
-            </svg>
-            Booking confirmed successfully! You&apos;ll be redirected to your
-            confirmation details.
-          </p>
+              Choose a different barber/time
+            </button>
+          </div>
         </div>
       );
     }
     return null;
   };
 
+  if (!selectedService || selectedServices.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Loading appointment details...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <main className="flex flex-col gap-6 mt-30 mb-16">
-      <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left column - Calendar and time selection */}
-          <DateTimeSelector
-            selectedDate={selectedDate}
-            onDateChange={handleDateChange}
-            onMonthChange={handleMonthChange}
-            onTimeSelect={handleTimeSelection}
-            selectedTime={selectedTime}
-            availableTimes={availableTimes}
-            availableDates={availableDates}
-            isLoading={isLoading}
-          />
+    <VerificationGuard requireVerification={true}>
+      <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto mt-28">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">
+            Book Your Appointment
+          </h1>
+          <p className="mt-2 text-gray-600">
+            Complete your booking and payment
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left column - Time selection or selected time display */}
+          <div className="space-y-6">
+            {timeAutoSelected && !showManualTimeSelection ? (
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-xl font-semibold mb-4">
+                  Your Selected Time
+                </h2>
+                {renderBookingStatus()}
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-xl font-semibold mb-4">
+                  Select Your Preferred Time
+                </h2>
+
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-sm text-gray-600">
+                      Select your preferred date and time
+                    </span>
+                    <button
+                      onClick={() => router.push("/book/barbers")}
+                      className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      Back to Barber Selection
+                    </button>
+                  </div>
+
+                  <DateTimeSelector
+                    selectedDate={selectedDate}
+                    onDateChange={handleDateChange}
+                    onMonthChange={handleMonthChange}
+                    onTimeSelect={handleTimeSelection}
+                    selectedTime={selectedTime}
+                    availableTimes={availableTimes}
+                    availableDates={availableDates}
+                    isLoading={isLoadingAvailability}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="overflow-hidden whitespace-nowrap md:hidden -mx-6">
+            <div className="flex animate-marquee">
+              {/* First set of images */}
+              <MarqueeItems />
+              {/* Duplicate set for seamless loop */}
+              <MarqueeItems />
+            </div>
+          </div>
 
           {/* Right column - Booking summary and payment */}
-          <div className="bg-white rounded-lg shadow-sm p-4">
-            <h2 className="text-base font-semibold mb-3">SUMMARY</h2>
-            {renderBookingStatus()}
+          <div ref={paymentSectionRef} className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-base font-semibold mb-3">BOOKING SUMMARY</h2>
 
-            {showPaymentForm ? (
-              <PaymentForm
-                squareCard={squareCard}
+            {/* {showPaymentForm ? (
+              <StablePaymentForm
                 selectedService={selectedService}
                 selectedTime={selectedTime}
-                processingPayment={processingPayment}
-                paymentError={paymentError}
-                handlePayment={handlePayment}
-                onCancelPayment={() => setShowPaymentForm(false)}
+                selectedServices={[
+                  ...selectedServices,
+                  ...additionalServices.map((as) => as.service),
+                ]}
+                onPaymentComplete={() => {
+                  console.log("✅ Payment completed successfully");
+                  setBookingConfirmed(true);
+                }}
+                onCancel={() => {
+                  console.log("❌ Payment cancelled");
+                  setShowPaymentForm(false);
+                }}
+                onAddAdditionalService={handleAddAdditionalService}
+                isLoadingServices={isLoadingServices}
+                onPaymentStateChange={handlePaymentStateChange}
               />
             ) : (
-              <BookingSummary
+              <>
+                <BookingSummary
+                  selectedService={selectedService}
+                  selectedTime={selectedTime}
+                  error={error}
+                  onProceedToPayment={handleShowPaymentForm}
+                  showPaymentForm={showPaymentForm}
+                  selectedServices={[
+                    ...selectedServices,
+                    ...additionalServices.map((as) => as.service),
+                  ]}
+                />
+
+                {/* Additional Services Section */}
+                {/* {additionalServices.length > 0 && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h3 className="text-sm font-medium mb-2 text-blue-800">
+                      Additional Services
+                    </h3>
+                    <div className="space-y-2">
+                      {additionalServices.map((additionalService, index) => (
+                        <div
+                          key={index}
+                          className="flex justify-between items-center text-xs"
+                        >
+                          <div className="flex-1">
+                            <p className="font-medium">
+                              {additionalService.service.name}
+                            </p>
+                            <p className="text-gray-600">
+                              {dayjs(additionalService.timeSlot.start_at)
+                                .tz("Australia/Melbourne")
+                                .format("h:mm A")}{" "}
+                              -
+                              {dayjs(additionalService.timeSlot.start_at)
+                                .add(
+                                  additionalService.service.duration > 10000
+                                    ? additionalService.service.duration / 60000
+                                    : additionalService.service.duration,
+                                  "minute",
+                                )
+                                .tz("Australia/Melbourne")
+                                .format("h:mm A")}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">
+                              $
+                              {(
+                                additionalService.service.price_amount / 100
+                              ).toFixed(2)}
+                            </span>
+                            <button
+                              onClick={() =>
+                                handleRemoveAdditionalService(index)
+                              }
+                              className="text-red-600 hover:text-red-800 text-xs"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )} */}
+
+                {/* Add Additional Service Button */}
+                {/* {selectedTime && !showPaymentForm && (
+                  <div className="mt-4">
+                    <Button
+                      onClick={handleAddAdditionalService}
+                      variant="outline"
+                      className="w-full bg-black text-white hover:bg-gray-800 border-black disabled:bg-gray-400 disabled:border-gray-400 disabled:cursor-not-allowed"
+                      disabled={!selectedTime || isLoadingServices}
+                    >
+                      {isLoadingServices ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Loading Services...
+                        </div>
+                      ) : selectedTime ? (
+                        "Add Additional Service"
+                      ) : (
+                        "Select Time First"
+                      )}
+                    </Button>
+                  </div>
+                )} */}
+              {/* </> */}
+            {/* )}  */}
+            
+            {/* Error Display */}
+            {error && (
+              <div className="mb-4 p-3 border border-red-400 bg-red-50 rounded-lg text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+
+            <StablePaymentForm
                 selectedService={selectedService}
                 selectedTime={selectedTime}
-                error={error}
-                onProceedToPayment={handleShowPaymentForm}
-                showPaymentForm={showPaymentForm}
+                selectedServices={[
+                  ...selectedServices,
+                  ...additionalServices.map((as) => as.service),
+                ]}
+                onPaymentComplete={() => {
+                  console.log("✅ Payment completed successfully");
+                  setBookingConfirmed(true);
+                }}
+                onCancel={() => {
+                  console.log("❌ Payment cancelled");
+                  // setShowPaymentForm(false); // Commented since showPaymentForm is not used
+                }}
+                onAddAdditionalService={handleAddAdditionalService}
+                isLoadingServices={isLoadingServices}
+                onPaymentStateChange={handlePaymentStateChange}
               />
-            )}
+          </div>
+        </div>
+
+        <div className="overflow-hidden whitespace-nowrap hidden md:block mt-4">
+          <div className="flex animate-marquee">
+            {/* First set of images */}
+            <MarqueeItems />
+            {/* Duplicate set for seamless loop */}
+            <MarqueeItems />
           </div>
         </div>
       </div>
-    </main>
+
+      {/* Loading Screen Overlay */}
+      {(isLoadingServices || isProcessingPayment || isCreatingBooking) && (
+        <div className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-sm w-full mx-4 text-center shadow-lg border">
+            <div className="w-12 h-12 border-4 border-gray-200 border-t-black rounded-full animate-spin mx-auto mb-4"></div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              {isLoadingServices ? 'Loading Services' : 
+               isProcessingPayment ? 'Processing Payment' :
+               isCreatingBooking ? 'Creating Booking' : 'Loading'}
+            </h3>
+            <p className="text-gray-600">
+              {isLoadingServices ? 'Please wait while we fetch available services...' :
+               isProcessingPayment ? 'Please wait while we process your payment...' :
+               isCreatingBooking ? 'Please wait while we create your booking...' : 'Please wait...'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Additional Service Selection Dialog */}
+      <Dialog open={showServiceDialog} onOpenChange={setShowServiceDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader className="border-b border-gray-200 pb-4">
+            <DialogTitle className="text-2xl font-bold text-gray-900 text-center">
+              Add Another Service
+            </DialogTitle>
+            <p className="text-gray-600 text-center mt-2">
+              Select an additional service with your current barber. Services
+              will be scheduled consecutively.
+            </p>
+          </DialogHeader>
+
+          <div className="overflow-y-auto max-h-[calc(90vh-140px)] p-6">
+            <div className="max-w-5xl mx-auto">
+              <div className="grid gap-3 sm:gap-4">
+                {allServices
+                  .filter((service) => {
+                    // Show all services - they'll be assigned to the same barber automatically
+                    console.log(
+                      `Showing service: ${service.name} (will use main barber for booking)`,
+                    );
+                    return true;
+                  })
+                  .map((service) => (
+                    <div
+                      key={service.id}
+                      onClick={() => handleSelectAdditionalService(service)}
+                      className="group relative bg-white border border-gray-200 rounded-lg p-4 hover:border-gray-300 hover:shadow-md transition-all cursor-pointer"
+                    >
+                      {/* Service Info */}
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-gray-900 group-hover:text-gray-700">
+                            {service.name}
+                          </h3>
+                          {service.description && (
+                            <p className="text-sm text-gray-600 mt-1">
+                              {service.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Service Details */}
+                      <div className="flex items-center justify-between text-sm text-gray-500">
+                        <div className="flex items-center gap-4">
+                          <span className="flex items-center gap-1">
+                            <span className="font-medium">Duration:</span>
+                            {service.duration > 10000
+                              ? Math.round(service.duration / 60000)
+                              : service.duration}{" "}
+                            min
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <span className="font-medium">Price:</span>$
+                            {(service.price_amount / 100).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Hover indicator */}
+                      <div className="absolute inset-0 border-2 border-transparent group-hover:border-blue-500 rounded-lg pointer-events-none transition-colors"></div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+    </VerificationGuard>
   );
+}
+
+export default function CleanAppointmentPage() {
+  return <CleanAppointmentPageContent />;
 }

@@ -4,6 +4,13 @@ import { Button } from "@/components/ui/button";
 import { BookingCalendar } from "@/components/ui/calendar";
 import { TimeSlot } from "@/lib/booking-service";
 import React from "react";
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+// Configure dayjs with timezone support
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 interface DateTimeSelectorProps {
   selectedDate: Date;
@@ -26,14 +33,11 @@ export const DateTimeSelector: React.FC<DateTimeSelectorProps> = ({
   availableDates,
   isLoading,
 }) => {
-  // Format time for display
+  // Format time for display in Melbourne timezone (for Australian users)
   const formatTime = (isoTime: string) => {
-    const time = new Date(isoTime);
-    return time.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
+    // Convert UTC time to Melbourne time
+    const melbourneTime = dayjs(isoTime).tz("Australia/Melbourne");
+    return melbourneTime.format("h:mm A");
   };
 
   // Skeleton loader for calendar

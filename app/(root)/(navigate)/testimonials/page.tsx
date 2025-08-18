@@ -1,7 +1,21 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 
 export default function Home() {
+  const router = useRouter();
+  const { isAuthenticated } = useAuth();
+
+  const handleBookBarber = () => {
+    if (isAuthenticated) {
+      router.push("/book/services");
+    } else {
+      router.push("/login?returnUrl=/book/services");
+    }
+  };
   return (
     <main className="flex flex-col gap-20">
       <section className="flex flex-col gap-8 px-4 mt-40 container mx-auto">
@@ -24,7 +38,7 @@ export default function Home() {
                 alt="The Haircut"
               />
 
-              <Button variant={"secondary"} className="w-full">
+              <Button variant={"secondary"} className="w-full" onClick={handleBookBarber}>
                 BOOK BARBER
               </Button>
             </div>
@@ -36,7 +50,7 @@ export default function Home() {
                 alt="The Haircut"
               />
 
-              <Button variant={"secondary"} className="w-full">
+              <Button variant={"secondary"} className="w-full" onClick={handleBookBarber}>
                 BOOK BARBER
               </Button>
             </div>
@@ -48,7 +62,7 @@ export default function Home() {
                 alt="The Haircut"
               />
 
-              <Button variant={"secondary"} className="w-full">
+              <Button variant={"secondary"} className="w-full" onClick={handleBookBarber}>
                 BOOK BARBER
               </Button>
             </div>

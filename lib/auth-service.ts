@@ -12,6 +12,7 @@ export interface User {
   birthday: string;
   role: string;
   verified: boolean;
+  password?: string | null; // Indicates if user has a password (for OAuth vs standard users)
   created_at: string;
   updated_at: string;
 }
@@ -29,6 +30,7 @@ export interface RegisterRequest {
 export interface LoginRequest {
   email: string;
   password: string;
+  rememberMe?: boolean;
 }
 
 export interface VerifyRequest {
@@ -69,6 +71,14 @@ export const AuthService = {
       if (responseData.data && responseData.data.token) {
         localStorage.setItem("token", responseData.data.token);
         localStorage.setItem("user", JSON.stringify(responseData.data.user));
+        
+        // Also set as cookie for middleware access (default to remember me for new registrations)
+        const expires = '; expires=' + new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString();
+        const isProduction = process.env.NODE_ENV === 'production';
+        const secureFlag = isProduction ? '; secure' : '';
+        document.cookie = `token=${responseData.data.token}; path=/${expires}${secureFlag}; samesite=lax`;
+        
+        console.log('🍪 Setting cookie for register:', { hasToken: !!responseData.data.token });
       }
       
       return responseData;
@@ -81,10 +91,29 @@ export const AuthService = {
     try {
       const responseData = await API.post<AuthResponse>('/auth/login', data);
       
-      // Store token and user data in localStorage
+      // Store token and user data
       if (responseData.data && responseData.data.token) {
-        localStorage.setItem("token", responseData.data.token);
-        localStorage.setItem("user", JSON.stringify(responseData.data.user));
+        const storage = data.rememberMe ? localStorage : sessionStorage;
+        storage.setItem("token", responseData.data.token);
+        storage.setItem("user", JSON.stringify(responseData.data.user));
+        
+        // Also set as cookie for middleware access
+        // Set cookie with appropriate expiration
+        const expires = data.rememberMe ? '; expires=' + new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString() : '';
+        const isProduction = process.env.NODE_ENV === 'production';
+        const secureFlag = isProduction ? '; secure' : '';
+        document.cookie = `token=${responseData.data.token}; path=/${expires}${secureFlag}; samesite=lax`;
+        
+        console.log('🍪 Setting cookie for login:', { hasToken: !!responseData.data.token, expires: !!expires });
+        
+        // Store remember me preference
+        localStorage.setItem("rememberMe", data.rememberMe ? "true" : "false");
+        
+        // If not remembering, clear any existing localStorage auth data
+        if (!data.rememberMe) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+        }
       }
       
       return responseData;
@@ -130,21 +159,69 @@ export const AuthService = {
     }
   },
 
+  async addPhoneNumber(phoneNumber: string): Promise<any> {
+    try {
+      const response = await API.post('/auth/add-phone', { phone_number: phoneNumber });
+      return response;
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to add phone number");
+    }
+  },
+
+  async updateProfile(data: any): Promise<any> {
+    try {
+      const response = await API.put('/auth/profile', data);
+      return response;
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to update profile");
+    }
+  },
+
+  async updatePassword(data: { current_password: string; new_password: string; confirm_password: string }): Promise<any> {
+    try {
+      const response = await API.put('/auth/password', data);
+      return response;
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to update password");
+    }
+  },
+
+  async createPassword(data: { new_password: string; confirm_password: string }): Promise<any> {
+    try {
+      const response = await API.post('/auth/create-password', data);
+      return response;
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to create password");
+    }
+  },
+
   logout(): void {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem("rememberMe");
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("user");
+    
+    // Clear token cookie
+    const isProduction = process.env.NODE_ENV === 'production';
+    const secureFlag = isProduction ? '; secure' : '';
+    document.cookie = `token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT${secureFlag}; samesite=lax`;
+    
+    console.log('🍪 Clearing cookie on logout');
   },
 
   getToken(): string | null {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("token");
+      // Check localStorage first, then sessionStorage
+      return localStorage.getItem("token") || sessionStorage.getItem("token");
     }
     return null;
   },
 
   getUser(): User | null {
     if (typeof window !== "undefined") {
-      const userStr = localStorage.getItem("user");
+      // Check localStorage first, then sessionStorage
+      const userStr = localStorage.getItem("user") || sessionStorage.getItem("user");
       if (userStr) {
         return JSON.parse(userStr);
       }
@@ -152,7 +229,95 @@ export const AuthService = {
     return null;
   },
 
+  isRemembered(): boolean {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("rememberMe") === "true";
+    }
+    return false;
+  },
+
   isAuthenticated(): boolean {
     return !!this.getToken();
+  },
+
+  // Google OAuth - Step 1: Verify token and check user status
+  async verifyGoogleAuth(idToken: string): Promise<any> {
+    try {
+      const responseData = await API.post('/auth/google/verify', {
+        idToken
+      });
+      return responseData;
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to verify Google token");
+    }
+  },
+
+  // Google OAuth - Step 2: Complete registration with phone number
+  async completeGoogleAuth(idToken: string, phoneNumber: string): Promise<AuthResponse> {
+    try {
+      const responseData = await API.post<AuthResponse>('/auth/google/complete', {
+        idToken,
+        phoneNumber
+      });
+      
+      // Store token and user data
+      if (responseData.data && responseData.data.token) {
+        localStorage.setItem("token", responseData.data.token);
+        localStorage.setItem("user", JSON.stringify(responseData.data.user));
+        
+        // Also set as cookie for middleware access
+        const expires = '; expires=' + new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString();
+        const isProduction = process.env.NODE_ENV === 'production';
+        const secureFlag = isProduction ? '; secure' : '';
+        document.cookie = `token=${responseData.data.token}; path=/${expires}${secureFlag}; samesite=lax`;
+        
+        console.log('🍪 Setting cookie for Google OAuth:', { hasToken: !!responseData.data.token });
+      }
+      
+      return responseData;
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to complete Google authentication");
+    }
+  },
+
+  // Apple OAuth - Step 1: Verify token and check user status
+  async verifyAppleAuth(idToken: string, authorizationCode?: string): Promise<any> {
+    try {
+      const responseData = await API.post('/auth/apple/verify', {
+        idToken,
+        authorizationCode
+      });
+      return responseData;
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to verify Apple token");
+    }
+  },
+
+  // Apple OAuth - Step 2: Complete registration with phone number
+  async completeAppleAuth(idToken: string, phoneNumber: string): Promise<AuthResponse> {
+    try {
+      const responseData = await API.post<AuthResponse>('/auth/apple/complete', {
+        idToken,
+        phoneNumber
+      });
+      
+      // Store token and user data
+      if (responseData.data && responseData.data.token) {
+        localStorage.setItem("token", responseData.data.token);
+        localStorage.setItem("user", JSON.stringify(responseData.data.user));
+        
+        // Also set as cookie for middleware access
+        const expires = '; expires=' + new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toUTCString();
+        const isProduction = process.env.NODE_ENV === 'production';
+        const secureFlag = isProduction ? '; secure' : '';
+        document.cookie = `token=${responseData.data.token}; path=/${expires}${secureFlag}; samesite=lax`;
+        
+        console.log('🍪 Setting cookie for Apple OAuth:', { hasToken: !!responseData.data.token });
+      }
+      
+      return responseData;
+    } catch (error: any) {
+      throw new Error(error.message || "Failed to complete Apple authentication");
+    }
   },
 };
