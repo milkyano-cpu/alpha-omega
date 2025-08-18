@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { SignUpForm } from "@/components/sign-up-form";
-import { FreshaRedirectWrapper } from "@/components/fresha-redirect";
 
 function SignUpContent() {
   return (
@@ -17,9 +16,5 @@ function SignUpContent() {
 }
 
 export default function SignUp() {
-  return (
-    <FreshaRedirectWrapper>
-      <SignUpContent />
-    </FreshaRedirectWrapper>
-  );
+  return <SignUpContent />;
 }

@@ -8,7 +8,6 @@ import { BookingService, TeamMember, Service } from "@/lib/booking-service";
 import { preloadBarberImages } from "@/lib/barber-images";
 import { PlusCheckbox } from "@/components/plus-checkbox";
 import { VerificationGuard } from "@/components/verification-guard";
-import { FreshaRedirectWrapper } from "@/components/fresha-redirect";
 
 function ServiceSelectionContent() {
   const [services, setServices] = useState<Service[]>([]);
@@ -348,9 +347,5 @@ function ServiceSelectionContent() {
 }
 
 export default function ServiceSelection() {
-  return (
-    <FreshaRedirectWrapper>
-      <ServiceSelectionContent />
-    </FreshaRedirectWrapper>
-  );
+  return <ServiceSelectionContent />;
 }

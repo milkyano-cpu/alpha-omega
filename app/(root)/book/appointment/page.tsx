@@ -25,7 +25,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { VerificationGuard } from "@/components/verification-guard";
-import { FreshaRedirectWrapper } from "@/components/fresha-redirect";
 
 // Additional service interface
 interface AdditionalService {
@@ -1013,9 +1012,5 @@ function CleanAppointmentPageContent() {
 }
 
 export default function CleanAppointmentPage() {
-  return (
-    <FreshaRedirectWrapper>
-      <CleanAppointmentPageContent />
-    </FreshaRedirectWrapper>
-  );
+  return <CleanAppointmentPageContent />;
 }

@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { LoginForm } from "@/components/login-form";
-import { FreshaRedirectWrapper } from "@/components/fresha-redirect";
 
 function LoginContent() {
   return (
@@ -17,9 +16,5 @@ function LoginContent() {
 }
 
 export default function Login() {
-  return (
-    <FreshaRedirectWrapper>
-      <LoginContent />
-    </FreshaRedirectWrapper>
-  );
+  return <LoginContent />;
 }
