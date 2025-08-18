@@ -68,18 +68,45 @@ export const StablePaymentForm: React.FC<StablePaymentFormProps> = ({
     };
   }, []);
 
-  // Initialize Square payment form once and only once
+  // Reset initialization when selectedTime changes
+  useEffect(() => {
+    if (selectedTime) {
+      console.log("🔄 Selected time changed, resetting Square initialization");
+      
+      // Clean up existing card if any (capture current squareCard in closure)
+      const currentCard = squareCard;
+      if (currentCard) {
+        try {
+          currentCard.destroy();
+          console.log("✅ Previous Square card destroyed");
+        } catch (e) {
+          console.log("Note: Error during card cleanup:", e);
+        }
+      }
+      
+      // Reset initialization flags immediately
+      initializationAttempted.current = false;
+      setSquareInitialized(false);
+      setSquareCard(null);
+      setPaymentError(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTime]); // Only depend on selectedTime, squareCard is captured in closure
+
+  // Initialize Square payment form when mounted and time is selected
   useEffect(() => {
     console.log("🔄 StablePaymentForm useEffect triggered", {
       initializationAttempted: initializationAttempted.current,
       mounted: mountedRef.current,
       isMounted,
       squareInitialized,
+      hasSelectedTime: !!selectedTime,
     });
 
-    if (!isMounted || initializationAttempted.current || squareInitialized) {
+    if (!isMounted || !selectedTime || initializationAttempted.current || squareInitialized) {
       console.log("⏭️ Skipping initialization:", {
         isMounted,
+        hasSelectedTime: !!selectedTime,
         alreadyAttempted: initializationAttempted.current,
         alreadyInitialized: squareInitialized,
       });
@@ -212,22 +239,41 @@ export const StablePaymentForm: React.FC<StablePaymentFormProps> = ({
           throw new Error("Failed to create Square card");
         }
 
-        // Wait for DOM element
+        // Wait for DOM element with more robust checking
         let domRetries = 0;
-        while (!containerRef.current && domRetries < 20) {
+        const maxDomRetries = 30; // Increased retries
+        
+        while (domRetries < maxDomRetries) {
+          // Check both containerRef and actual DOM element
+          const domElement = document.getElementById(containerId.current);
+          
+          if (containerRef.current && domElement) {
+            console.log("✅ DOM container found and ready for Square attachment");
+            break;
+          }
+          
           console.log(
-            `⏳ Waiting for DOM container... attempt ${domRetries + 1}/20`,
+            `⏳ Waiting for DOM container... attempt ${domRetries + 1}/${maxDomRetries}`,
+            {
+              containerRef: !!containerRef.current,
+              domElement: !!domElement,
+              containerId: containerId.current,
+            }
           );
-          await new Promise((resolve) => setTimeout(resolve, 100));
+          
+          await new Promise((resolve) => setTimeout(resolve, 150)); // Increased delay
           domRetries++;
         }
 
-        if (!containerRef.current || !mountedRef.current) {
-          console.error("❌ Container not found or component unmounted", {
-            containerExists: !!containerRef.current,
-            componentMounted: mountedRef.current,
+        const finalDomElement = document.getElementById(containerId.current);
+        if (!containerRef.current || !finalDomElement) {
+          console.error("❌ Container not found after retries", {
+            containerRef: !!containerRef.current,
+            domElement: !!finalDomElement,
+            containerId: containerId.current,
+            retries: domRetries,
           });
-          throw new Error("Container not found or component unmounted");
+          throw new Error("Container not found");
         }
 
         console.log(
@@ -286,7 +332,7 @@ export const StablePaymentForm: React.FC<StablePaymentFormProps> = ({
     return () => {
       clearTimeout(timer);
     };
-  }, [isMounted, squareInitialized]); // Depend on mounted state and initialization status
+  }, [isMounted, squareInitialized, selectedTime]); // Depend on mounted state, initialization status, and selected time
 
   // Cleanup on unmount
   useEffect(() => {
@@ -663,116 +709,125 @@ export const StablePaymentForm: React.FC<StablePaymentFormProps> = ({
         </div>
       )}
 
-      {/* Payment Form */}
-      <div className="space-y-4">
-        {!squareInitialized && !paymentError && (
-          <div className="p-4 bg-gray-50 rounded-lg text-center">
-            <p className="text-sm text-gray-600">Loading payment form...</p>
-          </div>
-        )}
+      {/* Payment Form - Only show when time is selected */}
+      {selectedTime && (
+        <div className="space-y-4">
+          {!squareInitialized && !paymentError && (
+            <div className="p-4 bg-gray-50 rounded-lg text-center">
+              <p className="text-sm text-gray-600">Loading payment form...</p>
+            </div>
+          )}
 
-        {paymentError && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-600 font-medium">Payment Error:</p>
-            <p className="text-sm text-red-600">{paymentError}</p>
-            {paymentError.includes("Payment successful") && (
-              <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
-                <p className="text-xs text-yellow-800">
-                  ⚠️ Your payment was processed but booking creation failed.
-                  Please contact support with payment ID from your bank
-                  statement.
-                </p>
-              </div>
-            )}
-            <button
-              onClick={() => {
-                setPaymentError(null);
-                initializationAttempted.current = false;
-                // Trigger re-initialization
-                window.location.reload();
-              }}
-              className="text-xs text-blue-600 hover:text-blue-800 underline mt-2"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {/* Square Card Container */}
-        <div
-          ref={containerRef}
-          id={containerId.current}
-          style={{
-            minHeight: "56px",
-            display: squareInitialized ? "block" : "none",
-          }}
-        />
-
-        <Image
-          src={"/assets/secure-payment.png"}
-          alt="secure payment"
-          height={120}
-          width={120}
-        />
-
-        {/* Debug info */}
-        {process.env.NODE_ENV === "development" && (
-          <div className="p-2 bg-gray-100 text-xs rounded text-gray-600">
-            Debug: Container ID = {containerId.current}
-            <br />
-            Initialized: {squareInitialized ? "Yes" : "No"}
-            <br />
-            Error: {paymentError || "None"}
-          </div>
-        )}
-
-        {/* Add Additional Service Button */}
-        {onAddAdditionalService &&
-          squareInitialized &&
-          !processingPayment &&
-          !creatingBooking && (
-            <Button
-              onClick={onAddAdditionalService}
-              variant="outline"
-              className="w-full py-2 text-sm border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600 disabled:bg-gray-100 disabled:border-gray-300 disabled:text-gray-500"
-              disabled={isLoadingServices}
-            >
-              {isLoadingServices ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                  Loading Services...
+          {paymentError && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600 font-medium">Payment Error:</p>
+              <p className="text-sm text-red-600">{paymentError}</p>
+              {paymentError.includes("Payment successful") && (
+                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+                  <p className="text-xs text-yellow-800">
+                    ⚠️ Your payment was processed but booking creation failed.
+                    Please contact support with payment ID from your bank
+                    statement.
+                  </p>
                 </div>
-              ) : (
-                "+ Add Another Service"
               )}
+              <button
+                onClick={() => {
+                  setPaymentError(null);
+                  initializationAttempted.current = false;
+                  // Trigger re-initialization
+                  window.location.reload();
+                }}
+                className="text-xs text-blue-600 hover:text-blue-800 underline mt-2"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* Square Card Container */}
+          <div
+            ref={containerRef}
+            id={containerId.current}
+            style={{
+              minHeight: "56px",
+              display: squareInitialized ? "block" : "none",
+            }}
+          />
+
+          <Image
+            src={"/assets/secure-payment.png"}
+            alt="secure payment"
+            height={120}
+            width={120}
+          />
+
+          {/* Debug info */}
+          {process.env.NODE_ENV === "development" && (
+            <div className="p-2 bg-gray-100 text-xs rounded text-gray-600">
+              Debug: Container ID = {containerId.current}
+              <br />
+              Initialized: {squareInitialized ? "Yes" : "No"}
+              <br />
+              Error: {paymentError || "None"}
+            </div>
+          )}
+
+          {/* Add Additional Service Button */}
+          {onAddAdditionalService &&
+            squareInitialized &&
+            !processingPayment &&
+            !creatingBooking && (
+              <Button
+                onClick={onAddAdditionalService}
+                variant="outline"
+                className="w-full py-2 text-sm border-blue-500 text-blue-600 hover:bg-blue-50 hover:border-blue-600 disabled:bg-gray-100 disabled:border-gray-300 disabled:text-gray-500"
+                disabled={isLoadingServices}
+              >
+                {isLoadingServices ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    Loading Services...
+                  </div>
+                ) : (
+                  "+ Add Another Service"
+                )}
+              </Button>
+            )}
+
+          {/* Payment Button */}
+          {squareInitialized && (
+            <Button
+              onClick={handlePayment}
+              disabled={processingPayment || creatingBooking}
+              className="w-full py-3 text-base bg-black hover:bg-gray-800 transition-colors text-white rounded-md font-normal"
+            >
+              {processingPayment
+                ? "Processing Payment..."
+                : creatingBooking
+                ? "Creating Booking..."
+                : `Pay Deposit $${depositAmount.toFixed(2)}`}
             </Button>
           )}
 
-        {/* Payment Button */}
-        {squareInitialized && (
+          {/* Cancel Button */}
           <Button
-            onClick={handlePayment}
+            onClick={onCancel}
             disabled={processingPayment || creatingBooking}
-            className="w-full py-3 text-base bg-black hover:bg-gray-800 transition-colors text-white rounded-md font-normal"
+            variant="outline"
+            className="w-full"
           >
-            {processingPayment
-              ? "Processing Payment..."
-              : creatingBooking
-              ? "Creating Booking..."
-              : `Pay Deposit $${depositAmount.toFixed(2)}`}
+            Cancel
           </Button>
-        )}
+        </div>
+      )}
 
-        {/* Cancel Button */}
-        <Button
-          onClick={onCancel}
-          disabled={processingPayment || creatingBooking}
-          variant="outline"
-          className="w-full"
-        >
-          Cancel
-        </Button>
-      </div>
+      {/* Message when no time is selected */}
+      {!selectedTime && (
+        <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-center">
+          <p className="text-sm text-gray-600">Please select a time to proceed with payment</p>
+        </div>
+      )}
     </div>
   );
 };

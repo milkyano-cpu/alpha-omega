@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -12,7 +12,6 @@ import {
 } from "@/lib/booking-service";
 import { StablePaymentForm } from "@/components/pages/appointment/StablePaymentForm";
 import {
-  BookingSummary,
   DateTimeSelector,
 } from "@/components/pages/appointment";
 import dayjs from "dayjs";
@@ -25,7 +24,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { VerificationGuard } from "@/components/verification-guard";
 import { FreshaRedirectWrapper } from "@/components/fresha-redirect";
 
@@ -41,14 +39,17 @@ dayjs.extend(timezone);
 
 function CleanAppointmentPageContent() {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
+  
+  // Ref for payment section to enable auto-scroll on mobile
+  const paymentSectionRef = useRef<HTMLDivElement>(null);
 
   // Core states
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedServices, setSelectedServices] = useState<Service[]>([]);
   const [selectedTime, setSelectedTime] = useState<TimeSlot | null>(null);
   const [timeAutoSelected, setTimeAutoSelected] = useState(false);
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  // const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
 
@@ -122,7 +123,7 @@ function CleanAppointmentPageContent() {
 
           setSelectedTime(parsedTimeSlot);
           setTimeAutoSelected(true);
-          setShowPaymentForm(true);
+          // setShowPaymentForm(true); // Commented since showPaymentForm is not used
 
           // Update selectedDate to match the auto-selected time's date
           if (parsedTimeSlot.start_at) {
@@ -350,13 +351,32 @@ function CleanAppointmentPageContent() {
     // Note: Don't clear additional services here - they'll be recalculated by useEffect
   };
 
-  const handleShowPaymentForm = () => {
-    if (!selectedService || !selectedTime || !user) {
-      setError("Please select a service and time first");
-      return;
+  // Auto-scroll to payment section on mobile when time is selected
+  useEffect(() => {
+    if (selectedTime && paymentSectionRef.current) {
+      // Check if we're on mobile (screen width < 1024px, which is lg breakpoint)
+      const isMobile = window.innerWidth < 1024;
+      
+      if (isMobile) {
+        // Small delay to ensure the payment form is rendered
+        setTimeout(() => {
+          paymentSectionRef.current?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+            inline: 'nearest'
+          });
+        }, 300);
+      }
     }
-    setShowPaymentForm(true);
-  };
+  }, [selectedTime]);
+
+  // const handleShowPaymentForm = () => {
+  //   if (!selectedService || !selectedTime || !user) {
+  //     setError("Please select a service and time first");
+  //     return;
+  //   }
+  //   setShowPaymentForm(true);
+  // };
 
   // Recalculate additional service times when main service time changes
   useEffect(() => {
@@ -621,9 +641,9 @@ function CleanAppointmentPageContent() {
     }
   };
 
-  const handleRemoveAdditionalService = (index: number) => {
-    setAdditionalServices((prev) => prev.filter((_, i) => i !== index));
-  };
+  // const handleRemoveAdditionalService = (index: number) => {
+  //   setAdditionalServices((prev) => prev.filter((_, i) => i !== index));
+  // };
 
   const handlePaymentStateChange = (processingPayment: boolean, creatingBooking: boolean) => {
     setIsProcessingPayment(processingPayment);
@@ -743,10 +763,10 @@ function CleanAppointmentPageContent() {
           </div>
 
           {/* Right column - Booking summary and payment */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div ref={paymentSectionRef} className="bg-white rounded-lg shadow-sm p-6">
             <h2 className="text-base font-semibold mb-3">BOOKING SUMMARY</h2>
 
-            {showPaymentForm ? (
+            {/* {showPaymentForm ? (
               <StablePaymentForm
                 selectedService={selectedService}
                 selectedTime={selectedTime}
@@ -781,7 +801,7 @@ function CleanAppointmentPageContent() {
                 />
 
                 {/* Additional Services Section */}
-                {additionalServices.length > 0 && (
+                {/* {additionalServices.length > 0 && (
                   <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <h3 className="text-sm font-medium mb-2 text-blue-800">
                       Additional Services
@@ -832,10 +852,10 @@ function CleanAppointmentPageContent() {
                       ))}
                     </div>
                   </div>
-                )}
+                )} */}
 
                 {/* Add Additional Service Button */}
-                {selectedTime && !showPaymentForm && (
+                {/* {selectedTime && !showPaymentForm && (
                   <div className="mt-4">
                     <Button
                       onClick={handleAddAdditionalService}
@@ -855,9 +875,36 @@ function CleanAppointmentPageContent() {
                       )}
                     </Button>
                   </div>
-                )}
-              </>
+                )} */}
+              {/* </> */}
+            {/* )}  */}
+            
+            {/* Error Display */}
+            {error && (
+              <div className="mb-4 p-3 border border-red-400 bg-red-50 rounded-lg text-red-700 text-sm">
+                {error}
+              </div>
             )}
+
+            <StablePaymentForm
+                selectedService={selectedService}
+                selectedTime={selectedTime}
+                selectedServices={[
+                  ...selectedServices,
+                  ...additionalServices.map((as) => as.service),
+                ]}
+                onPaymentComplete={() => {
+                  console.log("✅ Payment completed successfully");
+                  setBookingConfirmed(true);
+                }}
+                onCancel={() => {
+                  console.log("❌ Payment cancelled");
+                  // setShowPaymentForm(false); // Commented since showPaymentForm is not used
+                }}
+                onAddAdditionalService={handleAddAdditionalService}
+                isLoadingServices={isLoadingServices}
+                onPaymentStateChange={handlePaymentStateChange}
+              />
           </div>
         </div>
 
